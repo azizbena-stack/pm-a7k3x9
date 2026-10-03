@@ -1970,20 +1970,25 @@ async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   if(state.playingId===id){ stopPlayback(); return; }
-  // Priority order:
+  // Priority order (revised: a confirmed mobile test showed the hidden
+  // Spotify controller can report "playing" while staying silent — a
+  // cross-origin iframe's autoplay can be blocked by the phone's browser
+  // even when the iFrame API's own event says playback started, and there
+  // is no way to detect that from here. A real <audio> tag has none of
+  // that risk and is the one method already confirmed audible on iPhone,
+  // so it now comes first for every track, verified ID or not):
   //  1. An iTunes preview already resolved earlier this session for THIS
-  //     track — smoothest (single tap, no embed) and already verified, so
-  //     reuse it directly rather than re-opening an embed.
-  //  2. A verified identifier (t.spotifyId for the Monde/Pays catalogue,
-  //     t.youtubeId for Ville tracks synced from Soundcharts) — these were
-  //     pinned to the EXACT title/artist by hand/at sync time, not guessed
-  //     from text, so unlike the iTunes search below there is zero risk of
-  //     landing on the wrong song. We skip the iTunes guess entirely for
-  //     these and open the real embed instead — it may need one extra tap
-  //     inside the embed itself on iPhone (cross-origin autoplay is blocked
-  //     there even with `allow="autoplay"`, a WebKit policy, not a bug on
-  //     our side), but it is always audibly the right track.
-  //  3. iTunes Search API text-match fallback for everything else.
+  //     track — smoothest (single tap, no embed) and already verified.
+  //  2. A fresh iTunes Search API lookup, tried for EVERY track including
+  //     ones with a verified spotifyId/youtubeId. For those, the title and
+  //     artist used for the query are our own clean catalogue data (not
+  //     scraped/guessed text), so the match is high-confidence — and the
+  //     result is a real, branding-free 30s <audio> preview.
+  //  3. A verified identifier (t.spotifyId / t.youtubeId) — used only when
+  //     iTunes genuinely has no match for that exact title/artist. Still
+  //     guaranteed-correct, but the Spotify hidden-controller path can be
+  //     silent on some mobile browsers, so it's now the fallback rather
+  //     than the first choice.
   //  4. The generated placeholder loop, clearly labelled, as a last resort.
   if(t.itunesPreviewUrl){
     stopPlayback();
@@ -1994,6 +1999,38 @@ async function togglePlay(id){
     el.src = t.itunesPreviewUrl;
     el.play().catch(()=>{});
     return;
+  }
+  if(!t.itunesChecked){
+    // Prime the shared <audio> element with this exact tap's user gesture
+    // BEFORE the network lookup below — see ensureItunesAudioEl for why
+    // this is what makes the real preview actually audible on an iPhone,
+    // not just found.
+    stopPlayback();
+    state.playingId = id;
+    state.itunesLoading = true;
+    updatePlayerUI();
+    const el = ensureItunesAudioEl();
+    try{ el.src = SILENT_AUDIO_DATA_URI; el.play().catch(()=>{}); }catch(e){ /* priming is best-effort, fire-and-forget: some phones never settle this promise, and awaiting it was blocking ALL playback */ }
+    const hit = await lookupItunesPreview(t);
+    // Only lock this track to the generated preview for the rest of the
+    // session once Apple's answer is a confirmed negative (itunesCache has
+    // an entry for it). A network failure leaves itunesCache unset on
+    // purpose — t.itunesChecked stays false too, so the next tap gets a
+    // fresh attempt instead of being stuck because of a one-off hiccup.
+    if(itunesCache[t.id] !== undefined) t.itunesChecked = true;
+    if(state.playingId !== id) return; // listener moved on during the lookup
+    state.itunesLoading = false;
+    if(hit && hit.previewUrl){
+      t.itunesPreviewUrl = hit.previewUrl;
+      t.itunesTrackUrl = hit.trackViewUrl;
+      state.playingItunes = true;
+      updatePlayerUI();
+      el.src = hit.previewUrl;
+      el.play().catch(()=>{});
+      return;
+    }
+    // No iTunes match: fall through below to try spotifyId/youtubeId, then
+    // the generated loop as a last resort.
   }
   if(t.spotifyId){
     // Lecture pilotée en coulisses via l'API Spotify (contrôleur caché,
@@ -2028,47 +2065,12 @@ async function togglePlay(id){
     updatePlayerUI();
     return;
   }
-  if(t.itunesChecked){
-    // Already looked up earlier this session, no iTunes match — go straight
-    // to the generated preview, clearly labelled "extrait démo" in the mini
-    // player (never claims to be the real recording). The actual dishonest
-    // part was never "something plays" — it was Ville showing a fabricated
-    // genre next to it. That's fixed at the source now (no genre label is
-    // ever shown/filtered for a real city track), so it's safe for tapping
-    // play to always do something again instead of going silent.
-    playTrack(t);
-    return;
-  }
-  // Not checked yet: try the real 30s Apple Music preview first. Prime the
-  // shared <audio> element with this exact tap's user gesture BEFORE the
-  // network lookup below — see ensureItunesAudioEl for why this is what
-  // makes the real preview actually audible on an iPhone, not just found.
-  stopPlayback();
-  state.playingId = id;
-  state.itunesLoading = true;
-  updatePlayerUI();
-  const el = ensureItunesAudioEl();
-  try{ el.src = SILENT_AUDIO_DATA_URI; el.play().catch(()=>{}); }catch(e){ /* priming is best-effort, fire-and-forget: some phones never settle this promise, and awaiting it was blocking ALL playback */ }
-  const hit = await lookupItunesPreview(t);
-  // Only lock this track to the generated preview for the rest of the
-  // session once Apple's answer is a confirmed negative (itunesCache has an
-  // entry for it). A network failure leaves itunesCache unset on purpose —
-  // t.itunesChecked stays false too, so the next tap gets a fresh attempt
-  // instead of being stuck on the generic loop because of a one-off hiccup.
-  if(itunesCache[t.id] !== undefined) t.itunesChecked = true;
-  if(state.playingId !== id) return; // listener moved on during the lookup
-  state.itunesLoading = false;
-  if(hit && hit.previewUrl){
-    t.itunesPreviewUrl = hit.previewUrl;
-    t.itunesTrackUrl = hit.trackViewUrl;
-    state.playingItunes = true;
-    updatePlayerUI();
-    el.src = hit.previewUrl;
-    el.play().catch(()=>{});
-  } else {
-    state.playingId = null;
-    playTrack(t);
-  }
+  // Already checked iTunes earlier this session (no match) and no verified
+  // ID to fall back on — go straight to the generated preview, clearly
+  // labelled "extrait démo" in the mini player (never claims to be the
+  // real recording).
+  state.playingId = null;
+  playTrack(t);
 }
 function updateProgressUI(){
   if(!state.playingId) return;
