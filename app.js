@@ -1611,14 +1611,39 @@ function stopPlayback(){
   state.itunesLoading=false;
   updatePlayerUI();
 }
-// Apple's free, keyless iTunes Search API — used as a 3rd fallback (after a
-// verified Spotify/YouTube match) to play a real 30s preview of the actual
-// track instead of the generated loop. No daily quota, so this is resolved
-// on demand right when the listener taps play, not pre-fetched in bulk.
-// Results are cached per track for the session so a track is never searched
-// twice. Per Apple's terms, a found preview is always shown next to a link
-// to open the track in Apple Music (see renderMiniPlayer / track overlay).
+// Apple's free, keyless iTunes Search API — used after YouTube to play a
+// real 30s preview of the actual track instead of the generated loop. No
+// daily quota, so this is resolved on demand right when the listener taps
+// play, not pre-fetched in bulk. Results are cached per track for the
+// session so a track is never searched twice. Per Apple's terms, a found
+// preview is always shown next to a link to open the track in Apple Music
+// (see renderMiniPlayer / track overlay).
 const itunesCache = {};
+// A silent ~0s WAV, used only to "prime" the shared <audio> element below —
+// see ensureItunesAudioEl for why.
+const SILENT_AUDIO_DATA_URI = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+// iOS Safari only allows a *new* <audio> element's play() to succeed when the
+// call happens synchronously inside the tap's own event handler. The real
+// preview URL for an unseen track isn't known until a network round-trip
+// finishes, so a freshly-created element whose play() is called after that
+// await gets silently blocked on iPhone — this is exactly why the same track
+// could play for real on desktop (looser autoplay policy) but silently fall
+// back to the generated loop on a phone. The fix is a single <audio> element,
+// created once and kept in the DOM for the rest of the session (never
+// recreated via innerHTML), "primed" with a near-silent clip synchronously
+// on every tap — once an element has been allowed to play via a genuine user
+// gesture, WebKit keeps allowing programmatic play() calls on that SAME
+// element later, even from async code with no gesture of its own.
+let itunesAudioEl = null;
+function ensureItunesAudioEl(){
+  if(itunesAudioEl) return itunesAudioEl;
+  itunesAudioEl = document.createElement('audio');
+  itunesAudioEl.id = 'itunesAudioEl';
+  itunesAudioEl.style.display = 'none';
+  itunesAudioEl.addEventListener('ended', stopPlayback);
+  document.body.appendChild(itunesAudioEl);
+  return itunesAudioEl;
+}
 // {ok:true, hit:obj|null} on a completed request (hit is null = Apple genuinely
 // has nothing for this query) — {ok:false} on a network error/timeout, which
 // is NOT the same thing and must never be cached as a permanent "no match"
@@ -1695,8 +1720,9 @@ async function togglePlay(id){
     state.playingId = id;
     state.playingItunes = true;
     updatePlayerUI();
-    const el = document.getElementById('itunesAudioEl');
-    if(el) el.play().catch(()=>{});
+    const el = ensureItunesAudioEl();
+    el.src = t.itunesPreviewUrl;
+    el.play().catch(()=>{});
     return;
   }
   if(t.itunesChecked){
@@ -1707,11 +1733,16 @@ async function togglePlay(id){
     playTrack(t);
     return;
   }
-  // Not checked yet: try the real 30s Apple Music preview first.
+  // Not checked yet: try the real 30s Apple Music preview first. Prime the
+  // shared <audio> element with this exact tap's user gesture BEFORE the
+  // network lookup below — see ensureItunesAudioEl for why this is what
+  // makes the real preview actually audible on an iPhone, not just found.
   stopPlayback();
   state.playingId = id;
   state.itunesLoading = true;
   updatePlayerUI();
+  const el = ensureItunesAudioEl();
+  try{ el.src = SILENT_AUDIO_DATA_URI; await el.play(); el.pause(); }catch(e){ /* priming is best-effort — a real preview still plays if this fails, just possibly silently on iOS */ }
   const hit = await lookupItunesPreview(t);
   // Only lock this track to the generated preview for the rest of the
   // session once Apple's answer is a confirmed negative (itunesCache has an
@@ -1726,8 +1757,8 @@ async function togglePlay(id){
     t.itunesTrackUrl = hit.trackViewUrl;
     state.playingItunes = true;
     updatePlayerUI();
-    const el = document.getElementById('itunesAudioEl');
-    if(el) el.play().catch(()=>{});
+    el.src = hit.previewUrl;
+    el.play().catch(()=>{});
   } else {
     state.playingId = null;
     playTrack(t);
@@ -1777,12 +1808,13 @@ function renderMiniPlayer(){
   }
   if(state.playingItunes && t.itunesPreviewUrl){
     // Real 30s preview found via Apple's iTunes Search API — played through
-    // a plain <audio> element. Per Apple's terms this preview must sit next
-    // to a link to open the track in Apple Music, provided below.
+    // the shared, persistent <audio> element (see ensureItunesAudioEl; it is
+    // NOT re-emitted here — recreating it on every render is exactly what
+    // broke autoplay permission on iOS). Per Apple's terms this preview must
+    // sit next to a link to open the track in Apple Music, provided below.
     const g2 = genreById(t.genre);
     return `
     <div class="mini-player mini-player-spotify">
-      <audio id="itunesAudioEl" autoplay src="${t.itunesPreviewUrl}" onended="stopPlayback()" style="display:none;"></audio>
       <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
       <div class="mp-info">
         <div class="mp-title">${esc(t.title)}</div>
