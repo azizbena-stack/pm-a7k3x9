@@ -185,20 +185,14 @@ function renderRealTrackRow(entry, idx){
     // follow this tap's gesture on mobile Safari.
     youtubeId: t.youtube_id || null,
   };
-  const playing = state.playingId===rid;
-  const cover = t.cover_url
-    ? `<img src="${esc(t.cover_url)}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 44px;" onerror="this.style.visibility='hidden'"/>`
-    : `<div style="width:44px;height:44px;border-radius:10px;background:var(--card-2);flex:0 0 44px;"></div>`;
+  const t2 = realTracksCache[rid]; // normalized object (coverHTML/genreById expect this shape, same as Monde/Pays rows)
   return `
   <div class="track-row" style="padding-left:0;">
     <div class="rank ${idx<3?'top3':''}">${idx<3? ['🥇','🥈','🥉'][idx] : (idx+1)}</div>
-    <div class="cover-wrap" style="position:relative;">
-      ${cover}
-      <button class="play-overlay${playing?' playing':''}" data-action="toggle-play" data-id="${rid}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
-    </div>
+    ${coverHTML(t2,false)}
     <div class="t-info">
-      <div class="t-title">${esc(t.title||'—')}</div>
-      <div class="t-sub">${esc(t.artist_name||'')}</div>
+      <div class="t-title">${esc(t2.title)}</div>
+      <div class="t-sub"><span class="genre-dot" style="background:${genreById(t2.genre).color}"></span>${esc(t2.artist)} · ${genreById(t2.genre).name}</div>
     </div>
     <div class="t-right">${realTrackMoveHTML(entry.rank, entry.previous_rank)}</div>
   </div>`;
