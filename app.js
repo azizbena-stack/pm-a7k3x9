@@ -1734,6 +1734,7 @@ function stopPlayback(){
   }
   const itunesEl = document.getElementById('itunesAudioEl');
   if(itunesEl){ try{ itunesEl.pause(); }catch(e){} }
+  if(spotifyController){ try{ spotifyController.pause(); }catch(e){} }
   state.playingId=null;
   state.playingReal=false;
   state.playingItunes=false;
@@ -1773,6 +1774,85 @@ function ensureItunesAudioEl(){
   itunesAudioEl.addEventListener('ended', stopPlayback);
   document.body.appendChild(itunesAudioEl);
   return itunesAudioEl;
+}
+// ------------------------------------------------------------------------
+// Lecture Spotify "cachée" — pour que l'appli garde sa propre identité et ne
+// montre jamais le lecteur/logo Spotify, on pilote un contrôleur officiel
+// (API iFrame de Spotify, gratuite, sans connexion) depuis un cadre quasi
+// invisible plutôt que d'afficher leur widget. IMPORTANT : jamais
+// display:none sur ce cadre — la plupart des navigateurs mettent en pause
+// tout contenu intégré en display:none, on le réduit donc à 1px et une
+// opacité quasi nulle à la place, ce qui le laisse "affiché" techniquement.
+let spotifyController = null;
+let spotifyControllerEl = null;
+let spotifyControllerReadyPromise = null;
+let spotifyCurrentUri = null;
+function ensureSpotifyControllerHost(){
+  if(spotifyControllerEl) return spotifyControllerEl;
+  spotifyControllerEl = document.createElement('div');
+  spotifyControllerEl.id = 'spotifyEmbedHost';
+  spotifyControllerEl.style.cssText = 'position:fixed; width:1px; height:1px; opacity:0.01; overflow:hidden; pointer-events:none; left:-9999px; bottom:0;';
+  document.body.appendChild(spotifyControllerEl);
+  return spotifyControllerEl;
+}
+function loadSpotifyController(firstUri){
+  if(spotifyControllerReadyPromise) return spotifyControllerReadyPromise;
+  spotifyControllerReadyPromise = new Promise((resolve)=>{
+    // L'API peut être lente à charger (ou bloquée par le réseau) — on
+    // n'attend pas indéfiniment, sinon le bouton play resterait figé en
+    // "chargement" pour rien ; le code appelant bascule alors sur le widget
+    // visible classique plutôt que de laisser l'utilisateur sans rien.
+    const giveUp = setTimeout(()=>resolve(null), 5000);
+    window.onSpotifyIframeApiReady = (IFrameAPI) => {
+      try{
+        const host = ensureSpotifyControllerHost();
+        IFrameAPI.createController(host, { uri: firstUri, width:'1', height:'1' }, (controller) => {
+          clearTimeout(giveUp);
+          spotifyController = controller;
+          spotifyCurrentUri = firstUri;
+          resolve(controller);
+        });
+      }catch(e){ clearTimeout(giveUp); resolve(null); }
+    };
+    if(!document.getElementById('spotifyIframeApiScript')){
+      const s = document.createElement('script');
+      s.id = 'spotifyIframeApiScript';
+      s.src = 'https://open.spotify.com/embed/iframe-api/v1';
+      s.async = true;
+      s.onerror = () => resolve(null);
+      document.body.appendChild(s);
+    }
+  });
+  return spotifyControllerReadyPromise;
+}
+function startSpotifyHiddenPlayback(controller, uri, id){
+  let confirmed = false;
+  const onUpdate = (e) => {
+    if(e && !e.isPaused){
+      confirmed = true;
+      if(state.playingId===id){ state.playingReal = true; updatePlayerUI(); }
+    }
+  };
+  try{ controller.addListener('playback_update', onUpdate); }catch(e){}
+  const doPlay = () => { try{ controller.play(); }catch(e){} };
+  if(spotifyCurrentUri !== uri){
+    spotifyCurrentUri = uri;
+    try{ controller.loadUri(uri); }catch(e){}
+    setTimeout(doPlay, 250); // laisse le temps au chargement du nouvel URI avant de lancer la lecture
+  } else {
+    doPlay();
+  }
+  // Si après un délai raisonnable aucun évènement "ça joue vraiment" n'est
+  // arrivé (autoplay bloqué par le navigateur, typiquement iPhone), on
+  // bascule sur le widget Spotify visible classique — l'utilisateur appuie
+  // alors une fois dans le cadre qui apparaît, exactement comme avant,
+  // plutôt que de rester sur un bouton play qui ne fait rien.
+  setTimeout(()=>{
+    if(!confirmed && state.playingId===id && state.playingEmbed==='spotify-hidden'){
+      state.playingEmbed = 'spotify';
+      updatePlayerUI();
+    }
+  }, 2500);
 }
 // {ok:true, hit:obj|null} on a completed request (hit is null = Apple genuinely
 // has nothing for this query) — {ok:false} on a network error/timeout, which
@@ -1915,10 +1995,36 @@ async function togglePlay(id){
     el.play().catch(()=>{});
     return;
   }
-  if(t.spotifyId || t.youtubeId){
+  if(t.spotifyId){
+    // Lecture pilotée en coulisses via l'API Spotify (contrôleur caché,
+    // jamais leur lecteur/logo affiché) — notre propre mini-player sert
+    // d'interface. Si l'auto-lecture ne démarre vraiment pas (politique
+    // navigateur sur iPhone notamment), bascule automatiquement sur le
+    // widget Spotify visible classique après un court délai, pour ne
+    // jamais laisser un bouton play qui ne fait rien.
     stopPlayback();
     state.playingId = id;
-    state.playingEmbed = t.spotifyId ? 'spotify' : 'youtube';
+    state.playingEmbed = 'spotify-hidden';
+    state.itunesLoading = true;
+    updatePlayerUI();
+    const uri = 'spotify:track:'+t.spotifyId;
+    const controller = await loadSpotifyController(uri);
+    if(state.playingId !== id) return; // l'auditeur est passé à autre chose entretemps
+    if(!controller){
+      state.itunesLoading = false;
+      state.playingEmbed = 'spotify';
+      updatePlayerUI();
+      return;
+    }
+    state.itunesLoading = false;
+    updatePlayerUI();
+    startSpotifyHiddenPlayback(controller, uri, id);
+    return;
+  }
+  if(t.youtubeId){
+    stopPlayback();
+    state.playingId = id;
+    state.playingEmbed = 'youtube';
     updatePlayerUI();
     return;
   }
@@ -1987,6 +2093,22 @@ function renderMiniPlayer(){
   if(!state.playingId) return '';
   const t = TRACKS.find(x=>x.id===state.playingId) || realTracksCache[state.playingId];
   if(!t) return '';
+  if(state.playingEmbed==='spotify-hidden' && t.spotifyId){
+    // Lecture Spotify pilotée en coulisses — jamais de logo/widget Spotify
+    // affiché, barre dans le style maison comme pour Apple Music. Morceau
+    // vérifié (pas deviné), donc pas de badge "extrait démo".
+    const g2 = genreById(t.genre);
+    return `
+    <div class="mini-player mini-player-spotify">
+      <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
+      <div class="mp-info">
+        <div class="mp-title">${esc(t.title)}</div>
+        <div class="mp-artist">${esc(t.artist)}${t.isRealCity?'':` · <span style="color:${g2.color};">${g2.name}</span>`} · extrait vérifié</div>
+      </div>
+      <button data-action="toggle-play" data-id="${t.id}">⏸</button>
+      <button data-action="mini-player-stop" title="Arrêter">✕</button>
+    </div>`;
+  }
   if(state.playingEmbed==='spotify' && t.spotifyId){
     // Lecteur Spotify vérifié — jamais deviné, toujours le bon morceau. Sur
     // iPhone, le tap de départ ne suffit pas toujours à lancer le son tout
