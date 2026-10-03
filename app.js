@@ -1619,6 +1619,11 @@ function stopPlayback(){
 // twice. Per Apple's terms, a found preview is always shown next to a link
 // to open the track in Apple Music (see renderMiniPlayer / track overlay).
 const itunesCache = {};
+// {ok:true, hit:obj|null} on a completed request (hit is null = Apple genuinely
+// has nothing for this query) — {ok:false} on a network error/timeout, which
+// is NOT the same thing and must never be cached as a permanent "no match"
+// (see lookupItunesPreview below — this is what was silently conflating a
+// one-off mobile network hiccup with a confirmed absence on Apple Music).
 async function itunesSearchOnce(term){
   // Mobile connections are more prone to a slow/stalled request than desktop
   // wifi — cap each attempt at 6s so a bad network degrades to the next
@@ -1629,12 +1634,12 @@ async function itunesSearchOnce(term){
   try{
     const q = encodeURIComponent(term);
     const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`, controller ? {signal: controller.signal} : {});
+    if(!res.ok) return {ok:false};
     const data = await res.json();
     const hit = data && Array.isArray(data.results) ? data.results[0] : null;
-    if(hit && hit.previewUrl) return { previewUrl: hit.previewUrl, trackViewUrl: hit.trackViewUrl || null };
-  }catch(e){ /* network/timeout/parse error — treated same as no match, next attempt (if any) still runs */ }
+    return {ok:true, hit: (hit && hit.previewUrl) ? { previewUrl: hit.previewUrl, trackViewUrl: hit.trackViewUrl || null } : null};
+  }catch(e){ return {ok:false}; /* network/timeout/CORS error — not a confirmed absence */ }
   finally{ if(timer) clearTimeout(timer); }
-  return null;
 }
 async function lookupItunesPreview(t){
   const key = t.id;
@@ -1646,7 +1651,10 @@ async function lookupItunesPreview(t){
   // itself is there. Try the exact title+artist first, then a cleaned-up
   // title with just the lead artist, then the cleaned title alone — each
   // extra attempt only runs if the previous one found nothing, so a track
-  // that matches on the first try costs exactly one request.
+  // that matches on the first try costs exactly one request. The first,
+  // highest-value attempt gets one retry if it fails outright (vs. simply
+  // finding no result) — on a flaky mobile connection that one retry is
+  // often the difference between a real preview and the generated fallback.
   const cleanTitle = t.title.replace(/\s*\([^)]*\)\s*$/,'').trim() || t.title;
   const leadArtist = (t.artist||'').split(',')[0].trim();
   const attempts = [
@@ -1654,13 +1662,17 @@ async function lookupItunesPreview(t){
     cleanTitle !== t.title || leadArtist !== t.artist ? `${cleanTitle} ${leadArtist}` : null,
     cleanTitle !== t.title ? cleanTitle : null,
   ].filter(Boolean);
-  let result = null;
-  for(const term of attempts){
-    result = await itunesSearchOnce(term);
-    if(result) break;
+  let hit = null, anyFailed = false;
+  for(let i=0;i<attempts.length;i++){
+    let r = await itunesSearchOnce(attempts[i]);
+    if(!r.ok && i===0) r = await itunesSearchOnce(attempts[i]); // one retry, exact query only
+    if(!r.ok){ anyFailed = true; continue; }
+    if(r.hit){ hit = r.hit; break; }
   }
-  itunesCache[key] = result;
-  return result;
+  if(hit){ itunesCache[key] = hit; return hit; }
+  if(anyFailed) return null; // transient failure — leave uncached so the next tap retries
+  itunesCache[key] = null; // every attempt completed and genuinely found nothing — a real, cacheable negative
+  return null;
 }
 async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
@@ -1668,10 +1680,9 @@ async function togglePlay(id){
   if(state.playingId===id){ stopPlayback(); return; }
   // Priority: YouTube's official embed first (real song, already known, no
   // extra lookup needed) — then Apple's free iTunes Search API (also a real
-  // 30s clip of the actual track) — then Spotify's official widget only as
-  // a last resort for tracks the iTunes lookup didn't match — then the
-  // generated preview. Trying iTunes before Spotify means the Spotify
-  // widget only ever shows up when nothing else could be found.
+  // 30s clip of the actual track) — then the generated preview if Apple
+  // genuinely has nothing for this track (a network failure during the
+  // lookup does NOT count as "nothing" — see lookupItunesPreview).
   if(t.youtubeId){
     stopPlayback();
     state.playingId = id;
@@ -1702,7 +1713,12 @@ async function togglePlay(id){
   state.itunesLoading = true;
   updatePlayerUI();
   const hit = await lookupItunesPreview(t);
-  t.itunesChecked = true;
+  // Only lock this track to the generated preview for the rest of the
+  // session once Apple's answer is a confirmed negative (itunesCache has an
+  // entry for it). A network failure leaves itunesCache unset on purpose —
+  // t.itunesChecked stays false too, so the next tap gets a fresh attempt
+  // instead of being stuck on the generic loop because of a one-off hiccup.
+  if(itunesCache[t.id] !== undefined) t.itunesChecked = true;
   if(state.playingId !== id) return; // listener moved on during the lookup
   state.itunesLoading = false;
   if(hit && hit.previewUrl){
