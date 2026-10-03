@@ -64,24 +64,6 @@ const COUNTRIES = [
   {code:'MX', name:'Mexique', flag:'🇲🇽'},
   {code:'MA', name:'Maroc', flag:'🇲🇦'},
   {code:'NL', name:'Pays-Bas', flag:'🇳🇱'},
-  {code:'BE', name:'Belgique', flag:'🇧🇪'},
-  {code:'HR', name:'Croatie', flag:'🇭🇷'},
-  {code:'CH', name:'Suisse', flag:'🇨🇭'},
-  {code:'AT', name:'Autriche', flag:'🇦🇹'},
-  {code:'SE', name:'Suède', flag:'🇸🇪'},
-  {code:'TR', name:'Turquie', flag:'🇹🇷'},
-  {code:'TN', name:'Tunisie', flag:'🇹🇳'},
-  {code:'LB', name:'Liban', flag:'🇱🇧'},
-  {code:'EG', name:'Égypte', flag:'🇪🇬'},
-  {code:'AR', name:'Argentine', flag:'🇦🇷'},
-  {code:'CO', name:'Colombie', flag:'🇨🇴'},
-  {code:'TH', name:'Thaïlande', flag:'🇹🇭'},
-  {code:'ID', name:'Indonésie', flag:'🇮🇩'},
-  {code:'IN', name:'Inde', flag:'🇮🇳'},
-  {code:'AU', name:'Australie', flag:'🇦🇺'},
-  {code:'CA', name:'Canada', flag:'🇨🇦'},
-  {code:'JP', name:'Japon', flag:'🇯🇵'},
-  {code:'IE', name:'Irlande', flag:'🇮🇪'},
 ];
 const countryByCode = c => COUNTRIES.find(x=>x.code===c);
 
@@ -105,29 +87,6 @@ const CITIES = [
   {id:'tulum', name:'Tulum', country:'MX'},
   {id:'marrakech', name:'Marrakech', country:'MA'},
   {id:'amsterdam', name:'Amsterdam', country:'NL'},
-  // Villes ajoutées pour couvrir les nouveaux pays — pas encore synchronisées
-  // en direct via Soundcharts (voir APP_CITY_TO_DB_NAME / REAL_CITIES plus
-  // bas) : elles alimentent le classement simulé Monde/Pays mais ne peuvent
-  // pas apparaître dans le sélecteur "Ville" tant qu'un vrai flux de données
-  // n'existe pas pour elles.
-  {id:'bruxelles', name:'Bruxelles', country:'BE'},
-  {id:'zrce', name:'Zrce', country:'HR'},
-  {id:'zurich', name:'Zurich', country:'CH'},
-  {id:'vienne', name:'Vienne', country:'AT'},
-  {id:'stockholm', name:'Stockholm', country:'SE'},
-  {id:'istanbul', name:'Istanbul', country:'TR'},
-  {id:'hammamet', name:'Hammamet', country:'TN'},
-  {id:'beyrouth', name:'Beyrouth', country:'LB'},
-  {id:'elgouna', name:'El Gouna', country:'EG'},
-  {id:'buenosaires', name:'Buenos Aires', country:'AR'},
-  {id:'medellin', name:'Medellín', country:'CO'},
-  {id:'phuket', name:'Phuket', country:'TH'},
-  {id:'bali', name:'Bali', country:'ID'},
-  {id:'goa', name:'Goa', country:'IN'},
-  {id:'sydney', name:'Sydney', country:'AU'},
-  {id:'montreal', name:'Montréal', country:'CA'},
-  {id:'tokyo', name:'Tokyo', country:'JP'},
-  {id:'dublin', name:'Dublin', country:'IE'},
 ];
 const cityById = id => CITIES.find(c=>c.id===id);
 
@@ -150,12 +109,6 @@ const APP_CITY_TO_DB_NAME = {
   saopaulo:'Sao Paulo', capetown:'Cape Town', johannesburg:'Johannesburg', milan:'Milan',
   berlin:'Berlin', lisbon:'Lisbon', tulum:'Tulum', marrakech:'Marrakech', amsterdam:'Amsterdam',
 };
-// Sous-ensemble de CITIES qui a un vrai flux Soundcharts (clé présente dans
-// APP_CITY_TO_DB_NAME) — c'est cette liste, et seulement elle, qui doit
-// alimenter le sélecteur "Ville" et l'onglet "Ville" d'Explore : les
-// nouvelles villes ajoutées pour les pays supplémentaires n'ont pas de vrai
-// classement et ne doivent jamais y apparaître.
-const REAL_CITIES = CITIES.filter(c => !!APP_CITY_TO_DB_NAME[c.id]);
 const PLATFORM_LABEL = { apple_music:'Apple Music', spotify:'Spotify', shazam:'Shazam' };
 const PLATFORMS_UI = ['apple_music', 'spotify', 'shazam'];
 
@@ -175,14 +128,9 @@ async function getDbCityId(appCityId){
 }
 
 const realTracksCache = {}; // synthetic-id -> track-like object, so real chart rows can use the same play engine
-const realChartCache = {}; // `${appCityId}:${platform}:${period}` -> entries array (session-only)
-// period: 'today' (comparaison au jour précédent, fournie directement par Soundcharts
-// via previous_rank) | '7d' | '30d' (on recalcule alors le classement d'il y a 7/30
-// jours à partir d'un second instantané et on compare les morceaux par titre+artiste,
-// puisque leur identifiant peut changer d'un instantané à l'autre).
-async function fetchRealCityChart(appCityId, platform, period){
-  period = period || 'today';
-  const key = appCityId+':'+platform+':'+period;
+const realChartCache = {}; // `${appCityId}:${platform}` -> entries array (session-only)
+async function fetchRealCityChart(appCityId, platform){
+  const key = appCityId+':'+platform;
   if(realChartCache[key]) return realChartCache[key];
   const dbCityId = await getDbCityId(appCityId);
   if(!dbCityId){ realChartCache[key] = []; return []; }
@@ -195,48 +143,12 @@ async function fetchRealCityChart(appCityId, platform, period){
     if(!latestRows || !latestRows.length){ realChartCache[key] = []; return []; }
     const latestDate = latestRows[0].captured_at;
     const entriesRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${latestDate}&select=rank,previous_rank,tracks(title,artist_name,cover_url,youtube_id)&order=rank.asc&limit=100`,
+      `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${latestDate}&select=rank,previous_rank,tracks(title,artist_name,cover_url,youtube_id)&order=rank.asc&limit=30`,
       { headers: SUPABASE_HEADERS }
     );
-    let entries = await entriesRes.json();
-    entries = entries || [];
-
-    if(period!=='today' && entries.length){
-      const daysAgo = period==='30d' ? 30 : 7;
-      const targetDate = new Date(new Date(latestDate).getTime() - daysAgo*86400000).toISOString();
-      const histDateRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=lte.${targetDate}&select=captured_at&order=captured_at.desc&limit=1`,
-        { headers: SUPABASE_HEADERS }
-      );
-      const histDateRows = await histDateRes.json();
-      let histMap = null;
-      if(histDateRows && histDateRows.length){
-        const histDate = histDateRows[0].captured_at;
-        const histRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${histDate}&select=rank,tracks(title,artist_name)`,
-          { headers: SUPABASE_HEADERS }
-        );
-        const histEntries = await histRes.json();
-        histMap = {};
-        (histEntries||[]).forEach(h=>{
-          const t = h.tracks || {};
-          const k = (t.title||'').toLowerCase().trim()+'|'+(t.artist_name||'').toLowerCase().trim();
-          histMap[k] = h.rank;
-        });
-      }
-      // Remplace previous_rank par le rang d'il y a 7/30 jours (ou null si on n'a pas
-      // encore assez d'historique synchronisé pour remonter aussi loin, ou si le
-      // morceau n'était pas dans le classement à cette date).
-      entries = entries.map(e=>{
-        const t = e.tracks || {};
-        const k = (t.title||'').toLowerCase().trim()+'|'+(t.artist_name||'').toLowerCase().trim();
-        const histRank = histMap ? (histMap[k]!=null ? histMap[k] : null) : null;
-        return Object.assign({}, e, { previous_rank: histRank });
-      });
-    }
-
-    realChartCache[key] = entries;
-    return entries;
+    const entries = await entriesRes.json();
+    realChartCache[key] = entries || [];
+    return realChartCache[key];
   } catch(e){
     realChartCache[key] = [];
     return [];
@@ -248,65 +160,43 @@ function realTrackMoveHTML(rank, prev){
   if(prev > rank) return `<span class="t-trend up">▲ ${prev-rank}</span>`;
   return `<span class="t-trend down">▼ ${rank-prev}</span>`;
 }
-// IMPORTANT — leçon retenue : Soundcharts ne fournit AUCUN genre réel par morceau
-// pour les classements "Ville" (contrairement au catalogue simulé Monde/Pays). Une
-// version précédente assignait un genre inventé (déterministe mais faux), l'affichait
-// et s'en servait pour filtrer — ça a produit des titres reggaeton/latin trap étiquetés
-// "Techno", confirmé par capture vidéo. C'était la mauvaise approche : on ne doit
-// jamais présenter une donnée fabriquée comme si elle venait de Soundcharts.
-// cityTrackGenre() reste UNIQUEMENT pour varier la couleur/texture de la pochette
-// (coverStyle) — jamais affiché en texte, jamais utilisé pour filtrer la liste Ville.
-const CITY_PSEUDO_GENRES = ['afro-house','afro-tech','house','melodic-house','melodic-techno','techno'];
-function cityTrackGenre(title, artist){
-  const seedKey = (title||'')+'|'+(artist||'');
-  return CITY_PSEUDO_GENRES[strSeed(seedKey) % CITY_PSEUDO_GENRES.length];
-}
-// Le job de sync Soundcharts peut laisser une entrée dont le titre n'a pas encore
-// été résolu (placeholder côté base, ex. "Track Loading..."). Ne jamais afficher ça
-// comme si c'était un vrai titre de morceau — on filtre ces entrées de la liste.
-function isPlaceholderTitle(title){
-  if(!title) return true;
-  const s = String(title).trim();
-  if(!s) return true;
-  if(/loading/i.test(s)) return true;
-  if(/^(unknown|inconnu|n\/a|untitled|sans titre)$/i.test(s)) return true;
-  return false;
-}
-const FREE_LIMIT_TRACKS = 20; // doit rester identique à freeLimit dans renderHome
-function renderRealTrackRow(entry, idx, locked){
+function renderRealTrackRow(entry, idx){
   const t = entry.tracks || {};
   const seedKey = (t.title||'')+'|'+(t.artist_name||'');
   const rid = 'real-' + strSeed(seedKey+'|'+idx);
   realTracksCache[rid] = {
     id: rid,
-    isRealCity: true, // marque une entrée de classement ville réel : jamais de genre inventé affiché
     title: t.title || 'Titre inconnu',
     artist: t.artist_name || '',
     coverUrl: t.cover_url || null,
     coverSeed: strSeed(seedKey) % 9999,
-    genre: cityTrackGenre(t.title, t.artist_name), // cosmétique uniquement (couleur pochette) — voir note ci-dessus, jamais affiché/filtré
+    genre: 'house', // only used for the genre-color dot elsewhere in the UI, not for audio
     // profil démo assigné en tournant sur la position dans la liste (pas par hasard) :
     // deux morceaux voisins dans le classement n'ont jamais le même profil, et ces
     // profils sont volontairement très contrastés (voir DEMO_PROFILES) — tempo,
     // timbre du kick inclus, pas juste l'habillage en arrière-plan.
     demoProfile: DEMO_PROFILES[idx % DEMO_PROFILES.length],
     demoBpm: DEMO_PROFILES[idx % DEMO_PROFILES.length].bpm,
-    // Found automatically by the sync job (YouTube search) — kept only to
-    // offer a real video link from the track detail view. The quick tap-to-
-    // play button here always goes through the Apple Music preview /
-    // generated-loop pipeline instead (see togglePlay) — exactly like the
-    // Monde/Pays rows — because a YouTube iframe's autoplay cannot reliably
-    // follow this tap's gesture on mobile Safari.
+    // Found automatically by the sync job (YouTube search) — when present,
+    // tapping play streams the REAL song via YouTube's own embed player
+    // instead of the generated preview. null = not found yet, generated preview plays.
     youtubeId: t.youtube_id || null,
   };
-  const t2 = realTracksCache[rid]; // normalized object (coverHTML/genreById expect this shape, same as Monde/Pays rows)
+  const playing = state.playingId===rid;
+  const cover = t.cover_url
+    ? `<img src="${esc(t.cover_url)}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 44px;" onerror="this.style.visibility='hidden'"/>`
+    : `<div style="width:44px;height:44px;border-radius:10px;background:var(--card-2);flex:0 0 44px;"></div>`;
+  const youtubeBadge = t.youtube_id ? `<div style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#ff0033;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (YouTube)">▶</div>` : '';
   return `
-  <div class="track-row ${locked?'lock-row':''}" style="padding-left:0;">
+  <div class="track-row" style="padding-left:0;">
     <div class="rank ${idx<3?'top3':''}">${idx<3? ['🥇','🥈','🥉'][idx] : (idx+1)}</div>
-    ${coverHTML(t2,false)}
+    <div class="cover-wrap" style="position:relative;">
+      ${cover}${youtubeBadge}
+      <button class="play-overlay${playing?' playing':''}" data-action="toggle-play" data-id="${rid}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
+    </div>
     <div class="t-info">
-      <div class="t-title">${esc(t2.title)}</div>
-      <div class="t-sub">${esc(t2.artist)}</div>
+      <div class="t-title">${esc(t.title||'—')}</div>
+      <div class="t-sub">${esc(t.artist_name||'')}</div>
     </div>
     <div class="t-right">${realTrackMoveHTML(entry.rank, entry.previous_rank)}</div>
   </div>`;
@@ -316,19 +206,9 @@ function realChartPlatformTabsHTML(action, selected){
     ${PLATFORMS_UI.map(p=>`<button class="${p===selected?'active':''}" data-action="${action}" data-p="${p}">${PLATFORM_LABEL[p]}</button>`).join('')}
   </div>`;
 }
-function realChartListHTML(entries, opts){
-  opts = opts || {};
+function realChartListHTML(entries){
   if(!entries.length) return `<div class="empty-msg">Pas encore de classement synchronisé pour cette ville/plateforme.</div>`;
-  // Pas de filtre par genre ici : Soundcharts ne donne pas de genre réel par morceau
-  // pour les classements ville (voir note au-dessus de cityTrackGenre). On filtre en
-  // revanche les entrées dont le titre n'a pas encore été résolu par le job de sync
-  // (placeholder type "Track Loading...") — ne jamais montrer ça comme un vrai titre.
-  const filtered = entries.filter(e=>{
-    const t = e.tracks || {};
-    return !isPlaceholderTitle(t.title);
-  });
-  if(!filtered.length) return `<div class="empty-msg">Classement en cours de synchronisation, revenez dans quelques minutes.</div>`;
-  return filtered.map((e,i)=>renderRealTrackRow(e,i, opts.freeLimit!=null && i>=opts.freeLimit)).join('');
+  return entries.map((e,i)=>renderRealTrackRow(e,i)).join('');
 }
 
 /* ---------------------------- REAL CHART DATA -----------------------------
@@ -646,7 +526,6 @@ const state = {
   selectedCountry: 'ES',
   selectedCity: 'ibiza',
   period: '7d', // today|7d|30d
-  cityPeriod: 'today', // today|7d|30d — période de comparaison pour le classement réel "Ville"
   genreFilters: new Set(), // empty = all
   trendingPeriod: '7d',
   exploreMode: 'country', // country | city
@@ -998,7 +877,6 @@ const I18N = {
     'toast.proActivated': `🎉 PRO DJ activé (démo) — tout est débloqué !`,
     'toast.profileCreated': `Profil DJ créé ✅`,
     'toast.openingOn': `Ouverture sur {p}…`,
-    'toast.noPreview': `Aucun extrait audio réel disponible pour ce morceau`,
   },
   en: {
     'auth.tagline': `The Global DJ Music Intelligence Platform`,
@@ -1146,7 +1024,6 @@ const I18N = {
     'toast.proActivated': `🎉 PRO DJ activated (demo) — everything is unlocked!`,
     'toast.profileCreated': `DJ profile created ✅`,
     'toast.openingOn': `Opening on {p}…`,
-    'toast.noPreview': `No real audio preview available for this track`,
   },
   es: {
     'auth.tagline': `The Global DJ Music Intelligence Platform`,
@@ -1294,7 +1171,6 @@ const I18N = {
     'toast.proActivated': `🎉 PRO DJ activado (demo) — ¡todo desbloqueado!`,
     'toast.profileCreated': `Perfil DJ creado ✅`,
     'toast.openingOn': `Abriendo en {p}…`,
-    'toast.noPreview': `No hay extracto de audio real disponible para este tema`,
   },
   de: {
     'auth.tagline': `The Global DJ Music Intelligence Platform`,
@@ -1442,7 +1318,6 @@ const I18N = {
     'toast.proActivated': `🎉 PRO DJ aktiviert (Demo) — alles freigeschaltet!`,
     'toast.profileCreated': `DJ-Profil erstellt ✅`,
     'toast.openingOn': `Öffne bei {p}…`,
-    'toast.noPreview': `Kein echter Audio-Ausschnitt für diesen Track verfügbar`,
   },
 };
 function tr(key){
@@ -1551,7 +1426,7 @@ function coverHTML(t, big){
   // thumbnail URLs their site serves) — if it ever fails to load, the generative
   // artwork underneath shows through instead of a broken image.
   const img = t.coverUrl ? `<img src="${t.coverUrl}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;">` : '';
-  const spotifyBadge = t.itunesPreviewUrl ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (Apple Music)">✓</div>` : '';
+  const spotifyBadge = t.youtubeId ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#ff0033;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (YouTube)">▶</div>` : (t.itunesPreviewUrl ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (Apple Music)">✓</div>` : ((t.spotifyId && !t.itunesChecked) ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#1ed760;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible">✓</div>` : ''));
   return `<div class="cover-wrap">
     <div class="cover${big?' lg':''}" style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
     <button class="play-overlay${big?' lg':''}${playing?' playing':''}" data-action="toggle-play" data-id="${t.id}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
@@ -1736,183 +1611,77 @@ function stopPlayback(){
   state.itunesLoading=false;
   updatePlayerUI();
 }
-// Apple's free, keyless iTunes Search API — used after YouTube to play a
-// real 30s preview of the actual track instead of the generated loop. No
-// daily quota, so this is resolved on demand right when the listener taps
-// play, not pre-fetched in bulk. Results are cached per track for the
-// session so a track is never searched twice. Per Apple's terms, a found
-// preview is always shown next to a link to open the track in Apple Music
-// (see renderMiniPlayer / track overlay).
+// Apple's free, keyless iTunes Search API — used as a 3rd fallback (after a
+// verified Spotify/YouTube match) to play a real 30s preview of the actual
+// track instead of the generated loop. No daily quota, so this is resolved
+// on demand right when the listener taps play, not pre-fetched in bulk.
+// Results are cached per track for the session so a track is never searched
+// twice. Per Apple's terms, a found preview is always shown next to a link
+// to open the track in Apple Music (see renderMiniPlayer / track overlay).
 const itunesCache = {};
-// A silent ~0s WAV, used only to "prime" the shared <audio> element below —
-// see ensureItunesAudioEl for why.
-const SILENT_AUDIO_DATA_URI = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-// iOS Safari only allows a *new* <audio> element's play() to succeed when the
-// call happens synchronously inside the tap's own event handler. The real
-// preview URL for an unseen track isn't known until a network round-trip
-// finishes, so a freshly-created element whose play() is called after that
-// await gets silently blocked on iPhone — this is exactly why the same track
-// could play for real on desktop (looser autoplay policy) but silently fall
-// back to the generated loop on a phone. The fix is a single <audio> element,
-// created once and kept in the DOM for the rest of the session (never
-// recreated via innerHTML), "primed" with a near-silent clip synchronously
-// on every tap — once an element has been allowed to play via a genuine user
-// gesture, WebKit keeps allowing programmatic play() calls on that SAME
-// element later, even from async code with no gesture of its own.
-let itunesAudioEl = null;
-function ensureItunesAudioEl(){
-  if(itunesAudioEl) return itunesAudioEl;
-  itunesAudioEl = document.createElement('audio');
-  itunesAudioEl.id = 'itunesAudioEl';
-  itunesAudioEl.style.display = 'none';
-  itunesAudioEl.addEventListener('ended', stopPlayback);
-  document.body.appendChild(itunesAudioEl);
-  return itunesAudioEl;
-}
-// {ok:true, hit:obj|null} on a completed request (hit is null = Apple genuinely
-// has nothing for this query) — {ok:false} on a network error/timeout, which
-// is NOT the same thing and must never be cached as a permanent "no match"
-// (see lookupItunesPreview below — this is what was silently conflating a
-// one-off mobile network hiccup with a confirmed absence on Apple Music).
-// Bug trouvé le 2026-10-03 (soir) : l'appel iTunes ne récupérait QUE le tout
-// premier résultat (limit=1) et le jouait sans jamais vérifier qu'il
-// correspondait réellement au titre/artiste cherché — le classement de
-// pertinence d'Apple se trompe souvent sur des titres de club courts/génériques
-// ou des crédits DJ multiples, donc l'extrait joué pouvait être un morceau
-// complètement différent de celui affiché ("les musiques ne correspondent
-// pas"). Corrigé en récupérant plusieurs candidats (limit=5) et en ne gardant
-// que celui dont le titre ET l'artiste ressemblent vraiment à ce qu'on
-// cherchait (voir itunesHitMatches) ; si aucun des 5 ne correspond vraiment,
-// on considère qu'Apple n'a rien (on passe à la tentative suivante, puis à
-// l'extrait généré) plutôt que de jouer un morceau au hasard.
-function normText(s){
-  return (s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
-}
-function sigWords(s, minLen){ minLen = minLen || 3; return normText(s).split(' ').filter(w=>w.length>=minLen); }
-function itunesHitMatches(queryTitle, queryArtist, hitTrackName, hitArtistName){
-  const qTitleWords = sigWords(queryTitle);
-  if(!qTitleWords.length) return false;
-  const hTitle = normText(hitTrackName);
-  const titleHits = qTitleWords.filter(w=>hTitle.includes(w)).length;
-  const titleRatio = titleHits / qTitleWords.length;
-  // Crédits DJ multiples côté requête ("HUGEL, SOLTO (FR)") : on exige juste
-  // que le premier artiste cité apparaisse dans l'artiste du résultat Apple,
-  // pas la liste complète (Apple ne les cite pas toujours tous non plus).
-  // minLen=2 (pas 3) : beaucoup de pseudos DJ sont courts ou numériques
-  // ("19:26", "ANOTR") — testé et corrigé après avoir trouvé qu'un artiste
-  // purement numérique passait inaperçu et laissait n'importe quel résultat
-  // du même titre générique passer sans vérification d'artiste.
-  const leadArtistWords = sigWords((queryArtist||'').split(/[,&]/)[0], 2);
-  const hArtist = normText(hitArtistName);
-  const artistOk = leadArtistWords.length===0 || leadArtistWords.some(w=>hArtist.includes(w));
-  return titleRatio >= 0.6 && artistOk;
-}
-async function itunesSearchOnce(term){
-  // Mobile connections are more prone to a slow/stalled request than desktop
-  // wifi — cap each attempt at 6s so a bad network degrades to the next
-  // fallback (a cleaner search term, then the generated preview) quickly
-  // instead of leaving the listener staring at a stuck "loading" state.
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = controller ? setTimeout(()=>controller.abort(), 6000) : null;
-  try{
-    const q = encodeURIComponent(term);
-    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`, controller ? {signal: controller.signal} : {});
-    if(!res.ok) return {ok:false};
-    const data = await res.json();
-    const results = (data && Array.isArray(data.results)) ? data.results : [];
-    return {ok:true, results};
-  }catch(e){ return {ok:false}; /* network/timeout/CORS error — not a confirmed absence */ }
-  finally{ if(timer) clearTimeout(timer); }
-}
 async function lookupItunesPreview(t){
   const key = t.id;
   if(itunesCache[key] !== undefined) return itunesCache[key];
-  // Many catalogue titles carry DJ remix/edit suffixes — e.g. "(Dario Nunez &
-  // Juany Bravo Extended Remix)" — and a full artist credits list — e.g. "DJ
-  // Care, MikroBeats, Aaron Sevilla" — that the exact beatport-style string
-  // doesn't always match verbatim in Apple's catalogue, even when the song
-  // itself is there. Try the exact title+artist first, then a cleaned-up
-  // title with just the lead artist, then the cleaned title alone — each
-  // extra attempt only runs if the previous one found nothing, so a track
-  // that matches on the first try costs exactly one request. The first,
-  // highest-value attempt gets one retry if it fails outright (vs. simply
-  // finding no result) — on a flaky mobile connection that one retry is
-  // often the difference between a real preview and the generated fallback.
-  const cleanTitle = t.title.replace(/\s*\([^)]*\)\s*$/,'').trim() || t.title;
-  const leadArtist = (t.artist||'').split(/[,&]/)[0].trim();
-  const attempts = [
-    `${t.title} ${t.artist}`,
-    cleanTitle !== t.title || leadArtist !== t.artist ? `${cleanTitle} ${leadArtist}` : null,
-    cleanTitle !== t.title ? cleanTitle : null,
-  ].filter(Boolean);
-  let hit = null, anyFailed = false;
-  for(let i=0;i<attempts.length;i++){
-    let r = await itunesSearchOnce(attempts[i]);
-    if(!r.ok && i===0) r = await itunesSearchOnce(attempts[i]); // one retry, exact query only
-    if(!r.ok){ anyFailed = true; continue; }
-    const match = (r.results||[]).find(res => res.previewUrl && itunesHitMatches(t.title, t.artist, res.trackName, res.artistName));
-    if(match){ hit = { previewUrl: match.previewUrl, trackViewUrl: match.trackViewUrl || null }; break; }
-  }
-  if(hit){ itunesCache[key] = hit; return hit; }
-  if(anyFailed) return null; // transient failure — leave uncached so the next tap retries
-  itunesCache[key] = null; // every attempt completed and genuinely found nothing — a real, cacheable negative
-  return null;
+  let result = null;
+  try{
+    const q = encodeURIComponent(`${t.title} ${t.artist}`);
+    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`);
+    const data = await res.json();
+    const hit = data && Array.isArray(data.results) ? data.results[0] : null;
+    if(hit && hit.previewUrl){
+      result = { previewUrl: hit.previewUrl, trackViewUrl: hit.trackViewUrl || null };
+    }
+  }catch(e){ result = null; }
+  itunesCache[key] = result;
+  return result;
 }
 async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   if(state.playingId===id){ stopPlayback(); return; }
-  // Priority: Apple's free iTunes Search API first (a real 30s clip of the
-  // actual track, played through the primed <audio> element — reliable on
-  // iPhone, see ensureItunesAudioEl) — then the generated preview if Apple
-  // genuinely has nothing for this track (a network failure during the
-  // lookup does NOT count as "nothing" — see lookupItunesPreview).
-  // NOTE: a YouTube video embed is intentionally NOT used for the quick tap-
-  // to-play action here, even when t.youtubeId is known (city charts synced
-  // from Soundcharts always have one). A cross-origin YouTube iframe's
-  // autoplay cannot reliably inherit this tap's user gesture on mobile
-  // Safari — the video stays paused until the person taps a second time
-  // inside the embed itself, which read as "le son ne marche pas" on
-  // iPhone even though it worked on desktop Safari's looser policy. The
-  // real YouTube video is still available to watch manually in the track's
-  // detail view further below.
+  // Priority: YouTube's official embed first (real song, already known, no
+  // extra lookup needed) — then Apple's free iTunes Search API (also a real
+  // 30s clip of the actual track) — then Spotify's official widget only as
+  // a last resort for tracks the iTunes lookup didn't match — then the
+  // generated preview. Trying iTunes before Spotify means the Spotify
+  // widget only ever shows up when nothing else could be found.
+  if(t.youtubeId){
+    stopPlayback();
+    state.playingId = id;
+    state.playingReal = true;
+    updatePlayerUI();
+    return;
+  }
   if(t.itunesPreviewUrl){
     stopPlayback();
     state.playingId = id;
     state.playingItunes = true;
     updatePlayerUI();
-    const el = ensureItunesAudioEl();
-    el.src = t.itunesPreviewUrl;
-    el.play().catch(()=>{});
+    const el = document.getElementById('itunesAudioEl');
+    if(el) el.play().catch(()=>{});
     return;
   }
   if(t.itunesChecked){
-    // Already looked up earlier this session, no iTunes match. We used to
-    // fall back to a procedurally generated loop here — it kept "something"
-    // playing, but that something never actually matched the track's title,
-    // artist or genre, which read as "la musique ne correspond pas" to
-    // anyone who tapped it. Honest beats present-but-wrong: say no preview
-    // is available rather than play unrelated audio.
-    noPreviewAvailable();
+    // Already looked up earlier this session, no iTunes match — fall back
+    // to Spotify's official widget if this track has a verified id,
+    // otherwise the generated preview.
+    if(t.spotifyId){
+      stopPlayback();
+      state.playingId = id;
+      state.playingReal = true;
+      updatePlayerUI();
+    } else {
+      playTrack(t);
+    }
     return;
   }
-  // Not checked yet: try the real 30s Apple Music preview first. Prime the
-  // shared <audio> element with this exact tap's user gesture BEFORE the
-  // network lookup below — see ensureItunesAudioEl for why this is what
-  // makes the real preview actually audible on an iPhone, not just found.
+  // Not checked yet: try the real 30s Apple Music preview first.
   stopPlayback();
   state.playingId = id;
   state.itunesLoading = true;
   updatePlayerUI();
-  const el = ensureItunesAudioEl();
-  try{ el.src = SILENT_AUDIO_DATA_URI; el.play().catch(()=>{}); }catch(e){ /* priming is best-effort, fire-and-forget: some phones never settle this promise, and awaiting it was blocking ALL playback */ }
   const hit = await lookupItunesPreview(t);
-  // Only lock this track to the generated preview for the rest of the
-  // session once Apple's answer is a confirmed negative (itunesCache has an
-  // entry for it). A network failure leaves itunesCache unset on purpose —
-  // t.itunesChecked stays false too, so the next tap gets a fresh attempt
-  // instead of being stuck on the generic loop because of a one-off hiccup.
-  if(itunesCache[t.id] !== undefined) t.itunesChecked = true;
+  t.itunesChecked = true;
   if(state.playingId !== id) return; // listener moved on during the lookup
   state.itunesLoading = false;
   if(hit && hit.previewUrl){
@@ -1920,22 +1689,15 @@ async function togglePlay(id){
     t.itunesTrackUrl = hit.trackViewUrl;
     state.playingItunes = true;
     updatePlayerUI();
-    el.src = hit.previewUrl;
-    el.play().catch(()=>{});
+    const el = document.getElementById('itunesAudioEl');
+    if(el) el.play().catch(()=>{});
+  } else if(t.spotifyId){
+    state.playingReal = true;
+    updatePlayerUI();
   } else {
     state.playingId = null;
-    noPreviewAvailable();
+    playTrack(t);
   }
-}
-function noPreviewAvailable(){
-  // No real Apple Music preview exists for this track under its title/artist.
-  // Previously this played a procedurally generated loop instead — audibly
-  // unrelated to the actual song, which is exactly what read as "ça ne
-  // correspond pas au titre/artiste/genre". Better to say so plainly than to
-  // play something that sounds like a different song.
-  stopPlayback();
-  updatePlayerUI();
-  toast(tr('toast.noPreview'));
 }
 function updateProgressUI(){
   if(!state.playingId) return;
@@ -1960,6 +1722,28 @@ function renderMiniPlayer(){
   if(!state.playingId) return '';
   const t = TRACKS.find(x=>x.id===state.playingId) || realTracksCache[state.playingId];
   if(!t) return '';
+  if(state.playingReal && t.youtubeId){
+    // Real track found via YouTube — played through YouTube's own official
+    // embed player (its branding/controls can't be hidden, same rule as the
+    // Spotify widget below). Preferred over Spotify once found; Spotify
+    // remains the fallback below for tracks whose YouTube match hasn't been
+    // found yet, so nothing ever loses real audio during the transition.
+    return `
+    <div class="mini-player mini-player-spotify">
+      <iframe style="border-radius:10px;flex:1;min-width:0;" src="https://www.youtube.com/embed/${t.youtubeId}?autoplay=1" width="100%" height="80" frameborder="0" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="YouTube player — ${esc(t.title)}"></iframe>
+      <button data-action="mini-player-stop" title="Arrêter" style="flex:0 0 auto;">✕</button>
+    </div>`;
+  }
+  if(state.playingReal && t.spotifyId){
+    // Real track, played through Spotify's own official embed widget — its
+    // logo/UI can't be hidden (not something this app draws). Fallback while
+    // this track's YouTube match hasn't been found yet.
+    return `
+    <div class="mini-player mini-player-spotify">
+      <iframe style="border-radius:10px;flex:1;min-width:0;" src="https://open.spotify.com/embed/track/${t.spotifyId}?utm_source=generator&theme=0" width="100%" height="80" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="Spotify player — ${esc(t.title)}"></iframe>
+      <button data-action="mini-player-stop" title="Arrêter" style="flex:0 0 auto;">✕</button>
+    </div>`;
+  }
   if(state.itunesLoading){
     // Briefly shown while the on-demand Apple Music lookup is in flight
     // (usually well under a second).
@@ -1971,17 +1755,16 @@ function renderMiniPlayer(){
   }
   if(state.playingItunes && t.itunesPreviewUrl){
     // Real 30s preview found via Apple's iTunes Search API — played through
-    // the shared, persistent <audio> element (see ensureItunesAudioEl; it is
-    // NOT re-emitted here — recreating it on every render is exactly what
-    // broke autoplay permission on iOS). Per Apple's terms this preview must
-    // sit next to a link to open the track in Apple Music, provided below.
+    // a plain <audio> element. Per Apple's terms this preview must sit next
+    // to a link to open the track in Apple Music, provided below.
     const g2 = genreById(t.genre);
     return `
     <div class="mini-player mini-player-spotify">
+      <audio id="itunesAudioEl" autoplay src="${t.itunesPreviewUrl}" onended="stopPlayback()" style="display:none;"></audio>
       <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
       <div class="mp-info">
         <div class="mp-title">${esc(t.title)}</div>
-        <div class="mp-artist">${esc(t.artist)}${t.isRealCity?'':` · <span style="color:${g2.color};">${g2.name}</span>`} · extrait réel Apple Music</div>
+        <div class="mp-artist">${esc(t.artist)} · <span style="color:${g2.color};">${g2.name}</span> · extrait réel Apple Music</div>
       </div>
       ${t.itunesTrackUrl ? `<a href="${t.itunesTrackUrl}" target="_blank" rel="noopener" title="Ouvrir dans Apple Music" style="font-size:15px;flex:0 0 auto;">🎵</a>` : ''}
       <button data-action="toggle-play" data-id="${t.id}">⏸</button>
@@ -1994,7 +1777,7 @@ function renderMiniPlayer(){
     <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
     <div class="mp-info">
       <div class="mp-title">${esc(t.title)}</div>
-      <div class="mp-artist">${esc(t.artist)}${t.isRealCity?'':` · <span style="color:${g.color};">${g.name}</span>`} · extrait démo</div>
+      <div class="mp-artist">${esc(t.artist)} · <span style="color:${g.color};">${g.name}</span> · extrait démo</div>
       <div class="mp-progress"><div id="mpProgressFill" style="width:0%;"></div></div>
     </div>
     <button data-action="toggle-play" data-id="${t.id}">⏸</button>
@@ -2099,20 +1882,14 @@ function renderHome(){
       </select>` : ''}
     ${state.scope==='city' ? `
       <select class="chip-select" data-action="select-city" style="margin-top:9px;width:100%;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:12.5px;font-weight:700;">
-        ${REAL_CITIES.map(c=>`<option value="${c.id}" ${c.id===state.selectedCity?'selected':''}>${countryByCode(c.country).flag} ${c.name}</option>`).join('')}
-      </select>
-    <div class="segmented" style="margin-top:9px;">
-      <button class="${state.cityPeriod==='today'?'active':''}" data-action="city-period" data-period="today">${tr('home.periodToday')}</button>
-      <button class="${state.cityPeriod==='7d'?'active':''}" data-action="city-period" data-period="7d">${tr('home.period7d')}</button>
-      <button class="${state.cityPeriod==='30d'?'active':''}" data-action="city-period" data-period="30d">${tr('home.period30d')}</button>
-    </div>` : `
+        ${CITIES.map(c=>`<option value="${c.id}" ${c.id===state.selectedCity?'selected':''}>${countryByCode(c.country).flag} ${c.name}</option>`).join('')}
+      </select>` : `
     <div class="segmented" style="margin-top:9px;">
       <button class="${state.period==='today'?'active':''}" data-action="period" data-period="today">${tr('home.periodToday')}</button>
       <button class="${state.period==='7d'?'active':''}" data-action="period" data-period="7d">${tr('home.period7d')}</button>
       <button class="${state.period==='30d'?'active':''}" data-action="period" data-period="30d">${tr('home.period30d')}</button>
     </div>`}
-    ${state.scope!=='city' ? `
-    <div class="chiprow">
+    ${state.scope!=='city' ? `<div class="chiprow">
       <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
       <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
       <div class="chip ${quickGenreActive('afro-tech')?'active':''}" data-action="quickgenre" data-g="afro-tech">${tr('home.chipAfroTech')}</div>
@@ -2120,8 +1897,7 @@ function renderHome(){
       <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
       <div class="chip ${quickGenreActive('techno')?'active':''}" data-action="quickgenre" data-g="techno">${tr('home.chipTechno')}</div>
       <div class="chip ghost" data-action="open-genre-sheet">${tr('home.chipMoreGenres')}</div>
-    </div>` : `
-    <div style="font-size:10.5px;color:var(--text-muted);margin-top:9px;line-height:1.4;">Filtre par genre indisponible ici : Soundcharts ne fournit pas le genre réel de chaque morceau pour les classements ville.</div>`}
+    </div>` : ''}
   </div>
 
   <div class="section-title"><h2>${tr('home.trendingNow')}</h2>
@@ -2139,14 +1915,13 @@ function renderHome(){
   </div>
 
   <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' '+cname(state.selectedCountry).toUpperCase():tr('home.topPrefix')+' '+cityById(state.selectedCity).name.toUpperCase()}</h2>
-    ${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}
+    ${state.scope!=='city' && !isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}
   </div>
   ${state.scope==='city' ? `
   <div class="track-list" id="homeCityList">
     <div class="empty-msg">Chargement…</div>
   </div>
-  <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
-  ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : `
+  <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>` : `
   <div class="track-list">
     ${list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)).join('')}
   </div>
@@ -2158,11 +1933,10 @@ async function loadHomeCityList(){
   if(state.scope!=='city') return;
   const appCityId = state.selectedCity;
   const platform = state.homeCityPlatform || 'spotify';
-  const period = state.cityPeriod || 'today';
-  const entries = await fetchRealCityChart(appCityId, platform, period);
-  if(state.scope!=='city' || state.selectedCity!==appCityId || state.homeCityPlatform!==platform || state.cityPeriod!==period) return; // user moved on
+  const entries = await fetchRealCityChart(appCityId, platform);
+  if(state.scope!=='city' || state.selectedCity!==appCityId || state.homeCityPlatform!==platform) return; // user moved on
   const host = document.getElementById('homeCityList');
-  if(host) host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS });
+  if(host) host.innerHTML = realChartListHTML(entries);
 }
 
 function renderTrackRow(t, idx, locked){
@@ -2244,7 +2018,7 @@ function renderNextBig(){
    ============================================================================ */
 function renderExplore(){
   const mode = state.exploreMode;
-  const items = mode==='country' ? COUNTRIES : REAL_CITIES;
+  const items = mode==='country' ? COUNTRIES : CITIES;
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('explore.title')}</div></div>
@@ -2541,27 +2315,26 @@ function renderTrackOverlay(){
       </div>
 
       <div class="hpad">
-        ${t.itunesPreviewUrl ? `
+        ${t.youtubeId ? `
+          <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(255,0,51,.12);color:#ff0033;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeYoutube')}</div>
+          <iframe style="border-radius:12px;" src="https://www.youtube.com/embed/${t.youtubeId}" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="YouTube player — ${esc(t.title)}"></iframe>
+          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteYoutube')}</div>
+        ` : t.itunesPreviewUrl ? `
           <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(252,61,98,.12);color:#fc3d62;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeApple')}</div>
           <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteApple')}${t.itunesTrackUrl ? ` · <a href="${t.itunesTrackUrl}" target="_blank" rel="noopener" style="color:#fc3d62;">${tr('track.appleMusic')}</a>` : ''}</div>
+        ` : (t.spotifyId && t.itunesChecked) ? `
+          <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(30,215,96,.12);color:#1ed760;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadge')}</div>
+          <iframe style="border-radius:12px;" src="https://open.spotify.com/embed/track/${t.spotifyId}?utm_source=generator&theme=0" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="Spotify player — ${esc(t.title)}"></iframe>
+          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNote')}</div>
         ` : `
-          <!-- No Apple Music preview found for this track — Spotify's
-               widget is no longer used as a fallback, so this just plays
-               the generated preview. Same button/behavior as every Monde/
-               Pays track (see togglePlay): tapping it always goes through
-               the primed <audio> element, never a YouTube iframe, so it
-               stays reliable on iPhone. -->
+          <!-- No embed shown yet even if a Spotify id exists: tapping play
+               tries the real Apple Music preview first (togglePlay's
+               priority) — Spotify's widget only appears above once that
+               lookup has run and found nothing. -->
           <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${state.itunesLoading && state.playingId===t.id ? '…' : tr('track.audioGenNote')}</div>
         `}
-        ${t.youtubeId ? `
-          <div style="margin-top:10px;">
-            <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(255,0,51,.12);color:#ff0033;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeYoutube')}</div>
-            <iframe style="border-radius:12px;" src="https://www.youtube.com/embed/${t.youtubeId}" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="YouTube player — ${esc(t.title)}"></iframe>
-            <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteYoutube')}</div>
-          </div>
-        ` : ''}
       </div>
 
       <div class="hpad" style="margin-top:14px;">
@@ -2614,7 +2387,7 @@ function renderTrackOverlay(){
           ${t.label ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-top:1px solid var(--border-soft);"><span style="color:var(--text-muted);">${tr('track.label')}</span><span style="font-weight:700;">${esc(t.label)}</span></div>` : ''}
           ${t.chartRank ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-top:1px solid var(--border-soft);"><span style="color:var(--text-muted);">${tr('track.ranking')}</span><span style="font-weight:700;">${t.chartSource} ${esc(t.chartGenreName)} #${t.chartRank}</span></div>` : ''}
         </div>
-        ${t.chartRank ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5;">${tr('track.disclaimerBase')}${t.itunesPreviewUrl ? tr('track.disclaimerApple') : tr('track.disclaimerGenerated')}${tr('track.disclaimerTail')}</div>` : ''}
+        ${t.chartRank ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5;">${tr('track.disclaimerBase')}${t.youtubeId ? tr('track.disclaimerYoutube') : (t.itunesPreviewUrl ? tr('track.disclaimerApple') : ((t.spotifyId && t.itunesChecked) ? tr('track.disclaimerSpotify') : tr('track.disclaimerGenerated')))}${tr('track.disclaimerTail')}</div>` : ''}
       </div>
 
       <div class="section-title"><h2>${tr('track.listenFull')}</h2></div>
@@ -2976,10 +2749,9 @@ document.addEventListener('click', async (e)=>{
     renderAuthScreen();
   }
   else if(a==='nav'){ state.view = el.dataset.view; renderView(); }
-  else if(a==='scope'){ state.scope = el.dataset.scope; state.genreFilters = new Set(); renderView(); }
+  else if(a==='scope'){ state.scope = el.dataset.scope; renderView(); }
   else if(a==='home-city-platform'){ state.homeCityPlatform = el.dataset.p; renderView(); }
   else if(a==='period'){ state.period = el.dataset.period; renderView(); }
-  else if(a==='city-period'){ state.cityPeriod = el.dataset.period; renderView(); }
   else if(a==='quickgenre'){ setQuickGenre(el.dataset.g); }
   else if(a==='open-genre-sheet'){ openGenreSheet(); }
   else if(a==='close-genre-sheet'){ document.getElementById('genreOverlay').classList.add('hidden'); renderView(); }
