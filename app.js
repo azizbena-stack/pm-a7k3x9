@@ -1771,7 +1771,7 @@ function ensureItunesAudioEl(){
 function normText(s){
   return (s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
 }
-function sigWords(s){ return normText(s).split(' ').filter(w=>w.length>=3); }
+function sigWords(s, minLen){ minLen = minLen || 3; return normText(s).split(' ').filter(w=>w.length>=minLen); }
 function itunesHitMatches(queryTitle, queryArtist, hitTrackName, hitArtistName){
   const qTitleWords = sigWords(queryTitle);
   if(!qTitleWords.length) return false;
@@ -1781,7 +1781,11 @@ function itunesHitMatches(queryTitle, queryArtist, hitTrackName, hitArtistName){
   // Crédits DJ multiples côté requête ("HUGEL, SOLTO (FR)") : on exige juste
   // que le premier artiste cité apparaisse dans l'artiste du résultat Apple,
   // pas la liste complète (Apple ne les cite pas toujours tous non plus).
-  const leadArtistWords = sigWords((queryArtist||'').split(',')[0]);
+  // minLen=2 (pas 3) : beaucoup de pseudos DJ sont courts ou numériques
+  // ("19:26", "ANOTR") — testé et corrigé après avoir trouvé qu'un artiste
+  // purement numérique passait inaperçu et laissait n'importe quel résultat
+  // du même titre générique passer sans vérification d'artiste.
+  const leadArtistWords = sigWords((queryArtist||'').split(',')[0], 2);
   const hArtist = normText(hitArtistName);
   const artistOk = leadArtistWords.length===0 || leadArtistWords.some(w=>hArtist.includes(w));
   return titleRatio >= 0.6 && artistOk;
