@@ -998,6 +998,7 @@ const I18N = {
     'toast.proActivated': `🎉 PRO DJ activé (démo) — tout est débloqué !`,
     'toast.profileCreated': `Profil DJ créé ✅`,
     'toast.openingOn': `Ouverture sur {p}…`,
+    'toast.noPreview': `Aucun extrait audio réel disponible pour ce morceau`,
   },
   en: {
     'auth.tagline': `The Global DJ Music Intelligence Platform`,
@@ -1145,6 +1146,7 @@ const I18N = {
     'toast.proActivated': `🎉 PRO DJ activated (demo) — everything is unlocked!`,
     'toast.profileCreated': `DJ profile created ✅`,
     'toast.openingOn': `Opening on {p}…`,
+    'toast.noPreview': `No real audio preview available for this track`,
   },
   es: {
     'auth.tagline': `The Global DJ Music Intelligence Platform`,
@@ -1292,6 +1294,7 @@ const I18N = {
     'toast.proActivated': `🎉 PRO DJ activado (demo) — ¡todo desbloqueado!`,
     'toast.profileCreated': `Perfil DJ creado ✅`,
     'toast.openingOn': `Abriendo en {p}…`,
+    'toast.noPreview': `No hay extracto de audio real disponible para este tema`,
   },
   de: {
     'auth.tagline': `The Global DJ Music Intelligence Platform`,
@@ -1439,6 +1442,7 @@ const I18N = {
     'toast.proActivated': `🎉 PRO DJ aktiviert (Demo) — alles freigeschaltet!`,
     'toast.profileCreated': `DJ-Profil erstellt ✅`,
     'toast.openingOn': `Öffne bei {p}…`,
+    'toast.noPreview': `Kein echter Audio-Ausschnitt für diesen Track verfügbar`,
   },
 };
 function tr(key){
@@ -1883,11 +1887,13 @@ async function togglePlay(id){
     return;
   }
   if(t.itunesChecked){
-    // Already looked up earlier this session, no iTunes match — go straight
-    // to the generated preview. Spotify's widget is no longer used as a
-    // fallback (Apple Music covers the real-audio case on its own, with no
-    // API key, quota, or app-review process needed).
-    playTrack(t);
+    // Already looked up earlier this session, no iTunes match. We used to
+    // fall back to a procedurally generated loop here — it kept "something"
+    // playing, but that something never actually matched the track's title,
+    // artist or genre, which read as "la musique ne correspond pas" to
+    // anyone who tapped it. Honest beats present-but-wrong: say no preview
+    // is available rather than play unrelated audio.
+    noPreviewAvailable();
     return;
   }
   // Not checked yet: try the real 30s Apple Music preview first. Prime the
@@ -1918,8 +1924,18 @@ async function togglePlay(id){
     el.play().catch(()=>{});
   } else {
     state.playingId = null;
-    playTrack(t);
+    noPreviewAvailable();
   }
+}
+function noPreviewAvailable(){
+  // No real Apple Music preview exists for this track under its title/artist.
+  // Previously this played a procedurally generated loop instead — audibly
+  // unrelated to the actual song, which is exactly what read as "ça ne
+  // correspond pas au titre/artiste/genre". Better to say so plainly than to
+  // play something that sounds like a different song.
+  stopPlayback();
+  updatePlayerUI();
+  toast(tr('toast.noPreview'));
 }
 function updateProgressUI(){
   if(!state.playingId) return;
