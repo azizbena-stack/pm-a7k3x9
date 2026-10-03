@@ -2091,7 +2091,8 @@ function renderHome(){
     <div class="segmented">
       <button class="${state.scope==='world'?'active':''}" data-action="scope" data-scope="world">${tr('home.scopeWorld')}</button>
       <button class="${state.scope==='country'?'active':''}" data-action="scope" data-scope="country">${tr('home.scopeCountry')}</button>
-      <button class="${state.scope==='city'?'active':''}" data-action="scope" data-scope="city">${tr('home.scopeCity')}</button>
+      <!-- Ville retirée (demandé explicitement) — Monde + Pays uniquement pour l'instant. -->
+
     </div>
     ${state.scope==='country' ? `
       <select class="chip-select" data-action="select-country" style="margin-top:9px;width:100%;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:12.5px;font-weight:700;">
@@ -2243,15 +2244,13 @@ function renderNextBig(){
    EXPLORE — World map / Country ranking / City ranking
    ============================================================================ */
 function renderExplore(){
-  const mode = state.exploreMode;
+  // Ville retirée ici aussi — mode forcé sur 'country', plus de toggle tant
+  // qu'il n'y a qu'un seul choix.
+  const mode = 'country';
   const items = mode==='country' ? COUNTRIES : REAL_CITIES;
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('explore.title')}</div></div>
-    <div class="segmented">
-      <button class="${mode==='country'?'active':''}" data-action="explore-mode" data-m="country">${tr('explore.country')}</button>
-      <button class="${mode==='city'?'active':''}" data-action="explore-mode" data-m="city">${tr('explore.city')}</button>
-    </div>
   </div>
   <div class="section-title"><h2>${tr('explore.selectZone')}</h2></div>
   <div class="country-grid">
