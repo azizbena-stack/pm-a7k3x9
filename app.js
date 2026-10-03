@@ -846,6 +846,8 @@ const I18N = {
     'track.audioRealNote': `Audio réel diffusé directement depuis les serveurs Spotify (widget officiel intégré) — identifié manuellement pour ce morceau.`,
     'track.audioRealBadgeYoutube': `✓ Extrait audio réel — lecteur YouTube`,
     'track.audioRealNoteYoutube': `Audio réel diffusé directement depuis YouTube (lecteur officiel intégré) — trouvé automatiquement pour ce morceau.`,
+    'track.audioRealBadgeApple': `✓ Extrait audio réel — Apple Music`,
+    'track.audioRealNoteApple': `Extrait de 30 secondes du vrai morceau, via la recherche publique Apple Music.`,
     'track.audioGenNote': `Extrait généré pour la démo (pas encore identifié avec certitude sur Spotify) · adapté au genre du morceau`,
     'track.playExtract': `▶ Écouter l'extrait`,
     'track.pauseExtract': `⏸ Pause l'extrait`,
@@ -860,6 +862,7 @@ const I18N = {
     'track.disclaimerBase': `Identité du morceau (titre, artiste, label, classement, pochette) basée sur le chart public Beatport du jour.`,
     'track.disclaimerSpotify': ` L'extrait audio est le vrai morceau, diffusé via le lecteur officiel Spotify.`,
     'track.disclaimerYoutube': ` L'extrait audio est le vrai morceau, diffusé via le lecteur officiel YouTube.`,
+    'track.disclaimerApple': ` L'extrait audio est le vrai morceau (30 secondes), via la recherche publique Apple Music.`,
     'track.disclaimerGenerated': ` L'extrait audio est généré pour la démo (morceau pas encore identifié avec certitude sur Spotify).`,
     'track.disclaimerTail': ` Les indicateurs DJ (plays, pays, villes, DJ Score, croissance) sont simulés pour cette démo — ils viendront de la télémétrie DJ réelle en production.`,
     'genreSheet.combine': `Combiner des genres`,
@@ -990,6 +993,8 @@ const I18N = {
     'track.audioRealNote': `Real audio streamed directly from Spotify's servers (official embedded widget) — manually identified for this track.`,
     'track.audioRealBadgeYoutube': `✓ Real audio clip — YouTube player`,
     'track.audioRealNoteYoutube': `Real audio streamed directly from YouTube (official embedded player) — found automatically for this track.`,
+    'track.audioRealBadgeApple': `✓ Real audio clip — Apple Music`,
+    'track.audioRealNoteApple': `30-second clip of the real track, via Apple Music's public search.`,
     'track.audioGenNote': `Generated preview for the demo (not yet confidently matched on Spotify) · adapted to the track's genre`,
     'track.playExtract': `▶ Play preview`,
     'track.pauseExtract': `⏸ Pause preview`,
@@ -1004,6 +1009,7 @@ const I18N = {
     'track.disclaimerBase': `Track identity (title, artist, label, ranking, cover art) based on today's public Beatport chart.`,
     'track.disclaimerSpotify': ` The audio preview is the real track, streamed via the official Spotify player.`,
     'track.disclaimerYoutube': ` The audio preview is the real track, streamed via the official YouTube player.`,
+    'track.disclaimerApple': ` The audio preview is the real track (30 seconds), via Apple Music's public search.`,
     'track.disclaimerGenerated': ` The audio preview is generated for the demo (track not yet confidently matched on Spotify).`,
     'track.disclaimerTail': ` DJ metrics (plays, countries, cities, DJ Score, growth) are simulated for this demo — they'll come from real DJ telemetry in production.`,
     'genreSheet.combine': `Combine genres`,
@@ -1134,6 +1140,8 @@ const I18N = {
     'track.audioRealNote': `Audio real transmitido directamente desde los servidores de Spotify (widget oficial integrado) — identificado manualmente para este tema.`,
     'track.audioRealBadgeYoutube': `✓ Extracto de audio real — reproductor YouTube`,
     'track.audioRealNoteYoutube': `Audio real transmitido directamente desde YouTube (reproductor oficial integrado) — encontrado automáticamente para este tema.`,
+    'track.audioRealBadgeApple': `✓ Extracto de audio real — Apple Music`,
+    'track.audioRealNoteApple': `Extracto de 30 segundos del tema real, vía la búsqueda pública de Apple Music.`,
     'track.audioGenNote': `Extracto generado para la demo (aún no identificado con certeza en Spotify) · adaptado al género del tema`,
     'track.playExtract': `▶ Escuchar extracto`,
     'track.pauseExtract': `⏸ Pausar extracto`,
@@ -1148,6 +1156,7 @@ const I18N = {
     'track.disclaimerBase': `Identidad del tema (título, artista, sello, clasificación, portada) basada en el chart público de Beatport del día.`,
     'track.disclaimerSpotify': ` El extracto de audio es el tema real, transmitido a través del reproductor oficial de Spotify.`,
     'track.disclaimerYoutube': ` El extracto de audio es el tema real, transmitido a través del reproductor oficial de YouTube.`,
+    'track.disclaimerApple': ` El extracto de audio es el tema real (30 segundos), vía la búsqueda pública de Apple Music.`,
     'track.disclaimerGenerated': ` El extracto de audio se genera para la demo (tema aún no identificado con certeza en Spotify).`,
     'track.disclaimerTail': ` Los indicadores de DJ (reproducciones, países, ciudades, DJ Score, crecimiento) están simulados para esta demo — en producción vendrán de telemetría real de DJs.`,
     'genreSheet.combine': `Combinar géneros`,
@@ -1278,6 +1287,8 @@ const I18N = {
     'track.audioRealNote': `Echtes Audio, direkt von Spotifys Servern gestreamt (offizielles eingebettetes Widget) — für diesen Track manuell verifiziert.`,
     'track.audioRealBadgeYoutube': `✓ Echter Audio-Ausschnitt — YouTube-Player`,
     'track.audioRealNoteYoutube': `Echtes Audio, direkt von YouTube gestreamt (offizieller eingebetteter Player) — automatisch für diesen Track gefunden.`,
+    'track.audioRealBadgeApple': `✓ Echter Audio-Ausschnitt — Apple Music`,
+    'track.audioRealNoteApple': `30-Sekunden-Ausschnitt des echten Tracks, über die öffentliche Apple-Music-Suche.`,
     'track.audioGenNote': `Generierter Ausschnitt für die Demo (auf Spotify noch nicht mit Sicherheit gefunden) · an das Genre des Tracks angepasst`,
     'track.playExtract': `▶ Ausschnitt abspielen`,
     'track.pauseExtract': `⏸ Ausschnitt pausieren`,
@@ -1292,6 +1303,7 @@ const I18N = {
     'track.disclaimerBase': `Track-Identität (Titel, Künstler, Label, Ranking, Cover) basiert auf der öffentlichen Beatport-Chart des Tages.`,
     'track.disclaimerSpotify': ` Der Audio-Ausschnitt ist der echte Track, gestreamt über den offiziellen Spotify-Player.`,
     'track.disclaimerYoutube': ` Der Audio-Ausschnitt ist der echte Track, gestreamt über den offiziellen YouTube-Player.`,
+    'track.disclaimerApple': ` Der Audio-Ausschnitt ist der echte Track (30 Sekunden), über die öffentliche Apple-Music-Suche.`,
     'track.disclaimerGenerated': ` Der Audio-Ausschnitt wird für die Demo generiert (Track auf Spotify noch nicht mit Sicherheit identifiziert).`,
     'track.disclaimerTail': ` DJ-Kennzahlen (Plays, Länder, Städte, DJ Score, Wachstum) sind für diese Demo simuliert — in der Produktion stammen sie aus echter DJ-Telemetrie.`,
     'genreSheet.combine': `Genres kombinieren`,
@@ -1591,20 +1603,47 @@ function stopPlayback(){
     }catch(e){}
     playMasterGain=null;
   }
+  const itunesEl = document.getElementById('itunesAudioEl');
+  if(itunesEl){ try{ itunesEl.pause(); }catch(e){} }
   state.playingId=null;
   state.playingReal=false;
+  state.playingItunes=false;
+  state.itunesLoading=false;
   updatePlayerUI();
 }
-function togglePlay(id){
+// Apple's free, keyless iTunes Search API — used as a 3rd fallback (after a
+// verified Spotify/YouTube match) to play a real 30s preview of the actual
+// track instead of the generated loop. No daily quota, so this is resolved
+// on demand right when the listener taps play, not pre-fetched in bulk.
+// Results are cached per track for the session so a track is never searched
+// twice. Per Apple's terms, a found preview is always shown next to a link
+// to open the track in Apple Music (see renderMiniPlayer / track overlay).
+const itunesCache = {};
+async function lookupItunesPreview(t){
+  const key = t.id;
+  if(itunesCache[key] !== undefined) return itunesCache[key];
+  let result = null;
+  try{
+    const q = encodeURIComponent(`${t.title} ${t.artist}`);
+    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`);
+    const data = await res.json();
+    const hit = data && Array.isArray(data.results) ? data.results[0] : null;
+    if(hit && hit.previewUrl){
+      result = { previewUrl: hit.previewUrl, trackViewUrl: hit.trackViewUrl || null };
+    }
+  }catch(e){ result = null; }
+  itunesCache[key] = result;
+  return result;
+}
+async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   if(state.playingId===id){ stopPlayback(); return; }
-  // Tracks with a verified Spotify ID play the REAL song via Spotify's own
-  // official embed widget (free, public, meant to be used this way — no
-  // permission request needed, this is exactly what Spotify provides it for).
-  // Its branding can't be hidden or stripped — that's Spotify's own widget UI,
-  // not something this app draws — so it only appears on these specific tracks.
-  // Everything else (no verified ID) plays the app's own generated preview.
+  // Tracks with a verified Spotify/YouTube ID play the REAL song via that
+  // platform's own official embed widget (free, public, meant to be used
+  // this way — no permission request needed). Its branding can't be hidden
+  // or stripped — that's the platform's own widget UI, not something this
+  // app draws — so it only appears on these specific tracks.
   if(t.spotifyId || t.youtubeId){
     stopPlayback();
     state.playingId = id;
@@ -1612,7 +1651,42 @@ function togglePlay(id){
     updatePlayerUI();
     return;
   }
-  playTrack(t);
+  if(t.itunesPreviewUrl){
+    stopPlayback();
+    state.playingId = id;
+    state.playingItunes = true;
+    updatePlayerUI();
+    const el = document.getElementById('itunesAudioEl');
+    if(el) el.play().catch(()=>{});
+    return;
+  }
+  if(t.itunesChecked){
+    // Already looked up earlier this session, no match — straight to the
+    // generated preview, no point re-querying.
+    playTrack(t);
+    return;
+  }
+  // Not checked yet: try the real 30s Apple Music preview before falling
+  // back to the generated loop.
+  stopPlayback();
+  state.playingId = id;
+  state.itunesLoading = true;
+  updatePlayerUI();
+  const hit = await lookupItunesPreview(t);
+  t.itunesChecked = true;
+  if(state.playingId !== id) return; // listener moved on during the lookup
+  state.itunesLoading = false;
+  if(hit && hit.previewUrl){
+    t.itunesPreviewUrl = hit.previewUrl;
+    t.itunesTrackUrl = hit.trackViewUrl;
+    state.playingItunes = true;
+    updatePlayerUI();
+    const el = document.getElementById('itunesAudioEl');
+    if(el) el.play().catch(()=>{});
+  } else {
+    state.playingId = null;
+    playTrack(t);
+  }
 }
 function updateProgressUI(){
   if(!state.playingId) return;
@@ -1656,6 +1730,33 @@ function renderMiniPlayer(){
     return `
     <div class="mini-player mini-player-spotify">
       <iframe style="border-radius:10px;flex:1;min-width:0;" src="https://open.spotify.com/embed/track/${t.spotifyId}?utm_source=generator&theme=0" width="100%" height="80" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="Spotify player — ${esc(t.title)}"></iframe>
+      <button data-action="mini-player-stop" title="Arrêter" style="flex:0 0 auto;">✕</button>
+    </div>`;
+  }
+  if(state.itunesLoading){
+    // Briefly shown while the on-demand Apple Music lookup is in flight
+    // (usually well under a second).
+    return `
+    <div class="mini-player">
+      <div class="mp-info"><div class="mp-title">Recherche d'un extrait réel…</div></div>
+      <button data-action="mini-player-stop" title="Arrêter">✕</button>
+    </div>`;
+  }
+  if(state.playingItunes && t.itunesPreviewUrl){
+    // Real 30s preview found via Apple's iTunes Search API — played through
+    // a plain <audio> element. Per Apple's terms this preview must sit next
+    // to a link to open the track in Apple Music, provided below.
+    const g2 = genreById(t.genre);
+    return `
+    <div class="mini-player mini-player-spotify">
+      <audio id="itunesAudioEl" autoplay src="${t.itunesPreviewUrl}" onended="stopPlayback()" style="display:none;"></audio>
+      <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
+      <div class="mp-info">
+        <div class="mp-title">${esc(t.title)}</div>
+        <div class="mp-artist">${esc(t.artist)} · <span style="color:${g2.color};">${g2.name}</span> · extrait réel Apple Music</div>
+      </div>
+      ${t.itunesTrackUrl ? `<a href="${t.itunesTrackUrl}" target="_blank" rel="noopener" title="Ouvrir dans Apple Music" style="font-size:15px;flex:0 0 auto;">🎵</a>` : ''}
+      <button data-action="toggle-play" data-id="${t.id}">⏸</button>
       <button data-action="mini-player-stop" title="Arrêter" style="flex:0 0 auto;">✕</button>
     </div>`;
   }
@@ -2211,6 +2312,10 @@ function renderTrackOverlay(){
           <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(30,215,96,.12);color:#1ed760;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadge')}</div>
           <iframe style="border-radius:12px;" src="https://open.spotify.com/embed/track/${t.spotifyId}?utm_source=generator&theme=0" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="Spotify player — ${esc(t.title)}"></iframe>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNote')}</div>
+        ` : t.itunesPreviewUrl ? `
+          <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(252,61,98,.12);color:#fc3d62;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeApple')}</div>
+          <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
+          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteApple')}${t.itunesTrackUrl ? ` · <a href="${t.itunesTrackUrl}" target="_blank" rel="noopener" style="color:#fc3d62;">${tr('track.appleMusic')}</a>` : ''}</div>
         ` : `
           <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioGenNote')}</div>
@@ -2267,7 +2372,7 @@ function renderTrackOverlay(){
           ${t.label ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-top:1px solid var(--border-soft);"><span style="color:var(--text-muted);">${tr('track.label')}</span><span style="font-weight:700;">${esc(t.label)}</span></div>` : ''}
           ${t.chartRank ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-top:1px solid var(--border-soft);"><span style="color:var(--text-muted);">${tr('track.ranking')}</span><span style="font-weight:700;">${t.chartSource} ${esc(t.chartGenreName)} #${t.chartRank}</span></div>` : ''}
         </div>
-        ${t.chartRank ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5;">${tr('track.disclaimerBase')}${t.youtubeId ? tr('track.disclaimerYoutube') : (t.spotifyId ? tr('track.disclaimerSpotify') : tr('track.disclaimerGenerated'))}${tr('track.disclaimerTail')}</div>` : ''}
+        ${t.chartRank ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5;">${tr('track.disclaimerBase')}${t.youtubeId ? tr('track.disclaimerYoutube') : (t.spotifyId ? tr('track.disclaimerSpotify') : (t.itunesPreviewUrl ? tr('track.disclaimerApple') : tr('track.disclaimerGenerated')))}${tr('track.disclaimerTail')}</div>` : ''}
       </div>
 
       <div class="section-title"><h2>${tr('track.listenFull')}</h2></div>
