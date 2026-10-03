@@ -126,6 +126,9 @@ button{font-family:inherit;}
 .mini-player .mp-progress > div{ height:100%; background:var(--brand-grad); width:0%;}
 .mini-player button{ background:none; border:none; color:#fff; font-size:15px; cursor:pointer; padding:4px 5px; flex:0 0 auto;}
 .mini-player.mini-player-spotify{ padding:7px 10px; align-items:center;}
+.mini-player.mini-player-embed{ display:block; padding:8px 10px;}
+.mini-player.mini-player-embed .mp-embed-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+.mini-player.mini-player-embed .mp-title{ flex:1; min-width:0;}
 .t-info{ flex:1; min-width:0;}
 .t-title{ font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .t-sub{ font-size:11.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; display:flex; align-items:center; gap:5px;}
@@ -299,6 +302,6 @@ button{font-family:inherit;}
 <!-- ADMIN (breaks out of phone frame) -->
 <div id="adminOverlay" class="admin-root hidden"></div>
 
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>

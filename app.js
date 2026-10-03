@@ -1551,7 +1551,11 @@ function coverHTML(t, big){
   // thumbnail URLs their site serves) — if it ever fails to load, the generative
   // artwork underneath shows through instead of a broken image.
   const img = t.coverUrl ? `<img src="${t.coverUrl}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;">` : '';
-  const spotifyBadge = t.itunesPreviewUrl ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (Apple Music)">✓</div>` : '';
+  // Badge visible AVANT même d'appuyer sur play quand on a un identifiant
+  // vérifié (Spotify/YouTube, jamais deviné) — sinon seulement une fois
+  // qu'Apple Music a confirmé un extrait (ça, ça ne se sait qu'après coup).
+  const verified = !!(t.spotifyId || t.youtubeId);
+  const spotifyBadge = (verified || t.itunesPreviewUrl) ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="${verified?'Morceau vérifié (Spotify/YouTube)':'Extrait audio réel disponible (Apple Music)'}">✓</div>` : '';
   return `<div class="cover-wrap">
     <div class="cover${big?' lg':''}" style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
     <button class="play-overlay${big?' lg':''}${playing?' playing':''}" data-action="toggle-play" data-id="${t.id}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
@@ -1734,6 +1738,7 @@ function stopPlayback(){
   state.playingReal=false;
   state.playingItunes=false;
   state.itunesLoading=false;
+  state.playingEmbed=null;
   updatePlayerUI();
 }
 // Apple's free, keyless iTunes Search API — used after YouTube to play a
@@ -1885,20 +1890,21 @@ async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   if(state.playingId===id){ stopPlayback(); return; }
-  // Priority: Apple's free iTunes Search API first (a real 30s clip of the
-  // actual track, played through the primed <audio> element — reliable on
-  // iPhone, see ensureItunesAudioEl) — then the generated preview if Apple
-  // genuinely has nothing for this track (a network failure during the
-  // lookup does NOT count as "nothing" — see lookupItunesPreview).
-  // NOTE: a YouTube video embed is intentionally NOT used for the quick tap-
-  // to-play action here, even when t.youtubeId is known (city charts synced
-  // from Soundcharts always have one). A cross-origin YouTube iframe's
-  // autoplay cannot reliably inherit this tap's user gesture on mobile
-  // Safari — the video stays paused until the person taps a second time
-  // inside the embed itself, which read as "le son ne marche pas" on
-  // iPhone even though it worked on desktop Safari's looser policy. The
-  // real YouTube video is still available to watch manually in the track's
-  // detail view further below.
+  // Priority order:
+  //  1. An iTunes preview already resolved earlier this session for THIS
+  //     track — smoothest (single tap, no embed) and already verified, so
+  //     reuse it directly rather than re-opening an embed.
+  //  2. A verified identifier (t.spotifyId for the Monde/Pays catalogue,
+  //     t.youtubeId for Ville tracks synced from Soundcharts) — these were
+  //     pinned to the EXACT title/artist by hand/at sync time, not guessed
+  //     from text, so unlike the iTunes search below there is zero risk of
+  //     landing on the wrong song. We skip the iTunes guess entirely for
+  //     these and open the real embed instead — it may need one extra tap
+  //     inside the embed itself on iPhone (cross-origin autoplay is blocked
+  //     there even with `allow="autoplay"`, a WebKit policy, not a bug on
+  //     our side), but it is always audibly the right track.
+  //  3. iTunes Search API text-match fallback for everything else.
+  //  4. The generated placeholder loop, clearly labelled, as a last resort.
   if(t.itunesPreviewUrl){
     stopPlayback();
     state.playingId = id;
@@ -1907,6 +1913,13 @@ async function togglePlay(id){
     const el = ensureItunesAudioEl();
     el.src = t.itunesPreviewUrl;
     el.play().catch(()=>{});
+    return;
+  }
+  if(t.spotifyId || t.youtubeId){
+    stopPlayback();
+    state.playingId = id;
+    state.playingEmbed = t.spotifyId ? 'spotify' : 'youtube';
+    updatePlayerUI();
     return;
   }
   if(t.itunesChecked){
@@ -1974,6 +1987,32 @@ function renderMiniPlayer(){
   if(!state.playingId) return '';
   const t = TRACKS.find(x=>x.id===state.playingId) || realTracksCache[state.playingId];
   if(!t) return '';
+  if(state.playingEmbed==='spotify' && t.spotifyId){
+    // Lecteur Spotify vérifié — jamais deviné, toujours le bon morceau. Sur
+    // iPhone, le tap de départ ne suffit pas toujours à lancer le son tout
+    // seul (restriction navigateur sur les iframes d'un autre site) : le
+    // bouton play DANS l'encadré ci-dessous le fait à coup sûr.
+    return `
+    <div class="mini-player mini-player-embed">
+      <div class="mp-embed-head">
+        <div class="mp-title">${esc(t.title)}</div>
+        <button data-action="mini-player-stop" title="Arrêter">✕</button>
+      </div>
+      <iframe style="border-radius:12px;" src="https://open.spotify.com/embed/track/${t.spotifyId}?utm_source=app&autoplay=1" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="Spotify — ${esc(t.title)}"></iframe>
+      <div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;">Si le son ne démarre pas tout seul, appuie sur ▶ dans le cadre ci-dessus — morceau vérifié, jamais un extrait généré.</div>
+    </div>`;
+  }
+  if(state.playingEmbed==='youtube' && t.youtubeId){
+    return `
+    <div class="mini-player mini-player-embed">
+      <div class="mp-embed-head">
+        <div class="mp-title">${esc(t.title)}</div>
+        <button data-action="mini-player-stop" title="Arrêter">✕</button>
+      </div>
+      <iframe style="border-radius:12px;" src="https://www.youtube.com/embed/${t.youtubeId}?autoplay=1&playsinline=1" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="YouTube — ${esc(t.title)}"></iframe>
+      <div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:4px;">Si le son ne démarre pas tout seul, appuie sur ▶ dans le cadre ci-dessus — morceau vérifié, jamais un extrait généré.</div>
+    </div>`;
+  }
   if(state.itunesLoading){
     // Briefly shown while the on-demand Apple Music lookup is in flight
     // (usually well under a second).
