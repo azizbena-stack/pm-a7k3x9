@@ -1619,19 +1619,46 @@ function stopPlayback(){
 // twice. Per Apple's terms, a found preview is always shown next to a link
 // to open the track in Apple Music (see renderMiniPlayer / track overlay).
 const itunesCache = {};
+async function itunesSearchOnce(term){
+  // Mobile connections are more prone to a slow/stalled request than desktop
+  // wifi — cap each attempt at 6s so a bad network degrades to the next
+  // fallback (a cleaner search term, then the generated preview) quickly
+  // instead of leaving the listener staring at a stuck "loading" state.
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(()=>controller.abort(), 6000) : null;
+  try{
+    const q = encodeURIComponent(term);
+    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`, controller ? {signal: controller.signal} : {});
+    const data = await res.json();
+    const hit = data && Array.isArray(data.results) ? data.results[0] : null;
+    if(hit && hit.previewUrl) return { previewUrl: hit.previewUrl, trackViewUrl: hit.trackViewUrl || null };
+  }catch(e){ /* network/timeout/parse error — treated same as no match, next attempt (if any) still runs */ }
+  finally{ if(timer) clearTimeout(timer); }
+  return null;
+}
 async function lookupItunesPreview(t){
   const key = t.id;
   if(itunesCache[key] !== undefined) return itunesCache[key];
+  // Many catalogue titles carry DJ remix/edit suffixes — e.g. "(Dario Nunez &
+  // Juany Bravo Extended Remix)" — and a full artist credits list — e.g. "DJ
+  // Care, MikroBeats, Aaron Sevilla" — that the exact beatport-style string
+  // doesn't always match verbatim in Apple's catalogue, even when the song
+  // itself is there. Try the exact title+artist first, then a cleaned-up
+  // title with just the lead artist, then the cleaned title alone — each
+  // extra attempt only runs if the previous one found nothing, so a track
+  // that matches on the first try costs exactly one request.
+  const cleanTitle = t.title.replace(/\s*\([^)]*\)\s*$/,'').trim() || t.title;
+  const leadArtist = (t.artist||'').split(',')[0].trim();
+  const attempts = [
+    `${t.title} ${t.artist}`,
+    cleanTitle !== t.title || leadArtist !== t.artist ? `${cleanTitle} ${leadArtist}` : null,
+    cleanTitle !== t.title ? cleanTitle : null,
+  ].filter(Boolean);
   let result = null;
-  try{
-    const q = encodeURIComponent(`${t.title} ${t.artist}`);
-    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`);
-    const data = await res.json();
-    const hit = data && Array.isArray(data.results) ? data.results[0] : null;
-    if(hit && hit.previewUrl){
-      result = { previewUrl: hit.previewUrl, trackViewUrl: hit.trackViewUrl || null };
-    }
-  }catch(e){ result = null; }
+  for(const term of attempts){
+    result = await itunesSearchOnce(term);
+    if(result) break;
+  }
   itunesCache[key] = result;
   return result;
 }
