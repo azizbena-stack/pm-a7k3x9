@@ -1426,7 +1426,7 @@ function coverHTML(t, big){
   // thumbnail URLs their site serves) — if it ever fails to load, the generative
   // artwork underneath shows through instead of a broken image.
   const img = t.coverUrl ? `<img src="${t.coverUrl}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;">` : '';
-  const spotifyBadge = t.youtubeId ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#ff0033;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (YouTube)">▶</div>` : (t.spotifyId ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#1ed760;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio officiel Spotify disponible">✓</div>` : '');
+  const spotifyBadge = t.youtubeId ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#ff0033;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (YouTube)">▶</div>` : (t.itunesPreviewUrl ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (Apple Music)">✓</div>` : ((t.spotifyId && !t.itunesChecked) ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#1ed760;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible">✓</div>` : ''));
   return `<div class="cover-wrap">
     <div class="cover${big?' lg':''}" style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
     <button class="play-overlay${big?' lg':''}${playing?' playing':''}" data-action="toggle-play" data-id="${t.id}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
@@ -1639,12 +1639,13 @@ async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   if(state.playingId===id){ stopPlayback(); return; }
-  // Tracks with a verified Spotify/YouTube ID play the REAL song via that
-  // platform's own official embed widget (free, public, meant to be used
-  // this way — no permission request needed). Its branding can't be hidden
-  // or stripped — that's the platform's own widget UI, not something this
-  // app draws — so it only appears on these specific tracks.
-  if(t.spotifyId || t.youtubeId){
+  // Priority: YouTube's official embed first (real song, already known, no
+  // extra lookup needed) — then Apple's free iTunes Search API (also a real
+  // 30s clip of the actual track) — then Spotify's official widget only as
+  // a last resort for tracks the iTunes lookup didn't match — then the
+  // generated preview. Trying iTunes before Spotify means the Spotify
+  // widget only ever shows up when nothing else could be found.
+  if(t.youtubeId){
     stopPlayback();
     state.playingId = id;
     state.playingReal = true;
@@ -1661,13 +1662,20 @@ async function togglePlay(id){
     return;
   }
   if(t.itunesChecked){
-    // Already looked up earlier this session, no match — straight to the
-    // generated preview, no point re-querying.
-    playTrack(t);
+    // Already looked up earlier this session, no iTunes match — fall back
+    // to Spotify's official widget if this track has a verified id,
+    // otherwise the generated preview.
+    if(t.spotifyId){
+      stopPlayback();
+      state.playingId = id;
+      state.playingReal = true;
+      updatePlayerUI();
+    } else {
+      playTrack(t);
+    }
     return;
   }
-  // Not checked yet: try the real 30s Apple Music preview before falling
-  // back to the generated loop.
+  // Not checked yet: try the real 30s Apple Music preview first.
   stopPlayback();
   state.playingId = id;
   state.itunesLoading = true;
@@ -1683,6 +1691,9 @@ async function togglePlay(id){
     updatePlayerUI();
     const el = document.getElementById('itunesAudioEl');
     if(el) el.play().catch(()=>{});
+  } else if(t.spotifyId){
+    state.playingReal = true;
+    updatePlayerUI();
   } else {
     state.playingId = null;
     playTrack(t);
@@ -2308,17 +2319,21 @@ function renderTrackOverlay(){
           <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(255,0,51,.12);color:#ff0033;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeYoutube')}</div>
           <iframe style="border-radius:12px;" src="https://www.youtube.com/embed/${t.youtubeId}" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="YouTube player — ${esc(t.title)}"></iframe>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteYoutube')}</div>
-        ` : t.spotifyId ? `
-          <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(30,215,96,.12);color:#1ed760;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadge')}</div>
-          <iframe style="border-radius:12px;" src="https://open.spotify.com/embed/track/${t.spotifyId}?utm_source=generator&theme=0" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="Spotify player — ${esc(t.title)}"></iframe>
-          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNote')}</div>
         ` : t.itunesPreviewUrl ? `
           <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(252,61,98,.12);color:#fc3d62;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeApple')}</div>
           <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteApple')}${t.itunesTrackUrl ? ` · <a href="${t.itunesTrackUrl}" target="_blank" rel="noopener" style="color:#fc3d62;">${tr('track.appleMusic')}</a>` : ''}</div>
+        ` : (t.spotifyId && t.itunesChecked) ? `
+          <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(30,215,96,.12);color:#1ed760;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadge')}</div>
+          <iframe style="border-radius:12px;" src="https://open.spotify.com/embed/track/${t.spotifyId}?utm_source=generator&theme=0" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="Spotify player — ${esc(t.title)}"></iframe>
+          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNote')}</div>
         ` : `
+          <!-- No embed shown yet even if a Spotify id exists: tapping play
+               tries the real Apple Music preview first (togglePlay's
+               priority) — Spotify's widget only appears above once that
+               lookup has run and found nothing. -->
           <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
-          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioGenNote')}</div>
+          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${state.itunesLoading && state.playingId===t.id ? '…' : tr('track.audioGenNote')}</div>
         `}
       </div>
 
@@ -2372,7 +2387,7 @@ function renderTrackOverlay(){
           ${t.label ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-top:1px solid var(--border-soft);"><span style="color:var(--text-muted);">${tr('track.label')}</span><span style="font-weight:700;">${esc(t.label)}</span></div>` : ''}
           ${t.chartRank ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-top:1px solid var(--border-soft);"><span style="color:var(--text-muted);">${tr('track.ranking')}</span><span style="font-weight:700;">${t.chartSource} ${esc(t.chartGenreName)} #${t.chartRank}</span></div>` : ''}
         </div>
-        ${t.chartRank ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5;">${tr('track.disclaimerBase')}${t.youtubeId ? tr('track.disclaimerYoutube') : (t.spotifyId ? tr('track.disclaimerSpotify') : (t.itunesPreviewUrl ? tr('track.disclaimerApple') : tr('track.disclaimerGenerated')))}${tr('track.disclaimerTail')}</div>` : ''}
+        ${t.chartRank ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5;">${tr('track.disclaimerBase')}${t.youtubeId ? tr('track.disclaimerYoutube') : (t.itunesPreviewUrl ? tr('track.disclaimerApple') : ((t.spotifyId && t.itunesChecked) ? tr('track.disclaimerSpotify') : tr('track.disclaimerGenerated')))}${tr('track.disclaimerTail')}</div>` : ''}
       </div>
 
       <div class="section-title"><h2>${tr('track.listenFull')}</h2></div>
