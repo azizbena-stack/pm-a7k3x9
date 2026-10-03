@@ -248,6 +248,17 @@ function realTrackMoveHTML(rank, prev){
   if(prev > rank) return `<span class="t-trend up">▲ ${prev-rank}</span>`;
   return `<span class="t-trend down">▼ ${rank-prev}</span>`;
 }
+// Soundcharts ne fournit aucun genre réel par morceau pour les classements "Ville"
+// (contrairement au catalogue simulé Monde/Pays). On assigne donc un genre de façon
+// déterministe à partir du titre+artiste — toujours le même morceau = toujours le même
+// genre, jamais tiré au hasard à chaque rendu — uniquement pour (a) varier la pastille
+// de couleur sur les pochettes et (b) permettre aux chips de genre de filtrer la liste,
+// exactement comme Monde/Pays. Ce n'est PAS une donnée de genre réelle fournie par
+// Soundcharts : à ne jamais présenter comme telle ailleurs dans l'app.
+function cityTrackGenre(title, artist){
+  const seedKey = (title||'')+'|'+(artist||'');
+  return GENRES[strSeed(seedKey) % GENRES.length].id;
+}
 function renderRealTrackRow(entry, idx){
   const t = entry.tracks || {};
   const seedKey = (t.title||'')+'|'+(t.artist_name||'');
@@ -258,7 +269,7 @@ function renderRealTrackRow(entry, idx){
     artist: t.artist_name || '',
     coverUrl: t.cover_url || null,
     coverSeed: strSeed(seedKey) % 9999,
-    genre: 'house', // only used for the genre-color dot elsewhere in the UI, not for audio
+    genre: cityTrackGenre(t.title, t.artist_name), // voir cityTrackGenre ci-dessus — assignation déterministe, pas une vraie donnée Soundcharts
     // profil démo assigné en tournant sur la position dans la liste (pas par hasard) :
     // deux morceaux voisins dans le classement n'ont jamais le même profil, et ces
     // profils sont volontairement très contrastés (voir DEMO_PROFILES) — tempo,
@@ -292,7 +303,12 @@ function realChartPlatformTabsHTML(action, selected){
 }
 function realChartListHTML(entries){
   if(!entries.length) return `<div class="empty-msg">Pas encore de classement synchronisé pour cette ville/plateforme.</div>`;
-  return entries.map((e,i)=>renderRealTrackRow(e,i)).join('');
+  const filtered = entries.filter(e=>{
+    const t = e.tracks || {};
+    return trackMatchesGenreFilter({ genre: cityTrackGenre(t.title, t.artist_name) });
+  });
+  if(!filtered.length) return `<div class="empty-msg">Aucun morceau de ce classement ne correspond au genre sélectionné.</div>`;
+  return filtered.map((e,i)=>renderRealTrackRow(e,i)).join('');
 }
 
 /* ---------------------------- REAL CHART DATA -----------------------------
@@ -2025,7 +2041,7 @@ function renderHome(){
       <button class="${state.period==='7d'?'active':''}" data-action="period" data-period="7d">${tr('home.period7d')}</button>
       <button class="${state.period==='30d'?'active':''}" data-action="period" data-period="30d">${tr('home.period30d')}</button>
     </div>`}
-    ${state.scope!=='city' ? `<div class="chiprow">
+    <div class="chiprow">
       <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
       <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
       <div class="chip ${quickGenreActive('afro-tech')?'active':''}" data-action="quickgenre" data-g="afro-tech">${tr('home.chipAfroTech')}</div>
@@ -2033,7 +2049,7 @@ function renderHome(){
       <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
       <div class="chip ${quickGenreActive('techno')?'active':''}" data-action="quickgenre" data-g="techno">${tr('home.chipTechno')}</div>
       <div class="chip ghost" data-action="open-genre-sheet">${tr('home.chipMoreGenres')}</div>
-    </div>` : ''}
+    </div>
   </div>
 
   <div class="section-title"><h2>${tr('home.trendingNow')}</h2>
