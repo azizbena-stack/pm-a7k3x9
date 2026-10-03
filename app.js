@@ -1999,6 +1999,20 @@ async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   if(state.playingId===id){ stopPlayback(); return; }
+  // Débloque le contexte Web Audio (moteur de la boucle générée, dernier
+  // recours ci-dessous) DANS CE TAP, de façon synchrone, avant tout
+  // "await" — sans ça, si ce morceau finit par retomber jusqu'à la boucle
+  // générée après un ou deux appels réseau (iTunes puis Deezer), le
+  // navigateur mobile peut considérer qu'on n'est plus "dans le geste de
+  // l'utilisateur" et refuser silencieusement de démarrer l'audio : aucun
+  // extrait ne joue, aucune erreur visible, juste un tap qui ne fait rien.
+  // Trouvé le 2026-10-03 (ajout de Deezer ci-dessous, qui allonge l'attente
+  // avant la boucle générée) : correspond à "il manque un morceau sur 10"
+  // — un morceau sans correspondance iTunes/Deezer/Spotify/YouTube qui ne
+  // jouait plus du tout. Appeler resume() ici, tôt et sans l'attendre,
+  // suffit à "déverrouiller" le contexte pour le reste de ce tap même si
+  // playTrack() ne s'exécute vraiment que bien plus tard.
+  try{ const c = ensureAudioCtx(); if(c.state==='suspended') c.resume().catch(()=>{}); }catch(e){}
   // Priority order (revised: a confirmed mobile test showed the hidden
   // Spotify controller can report "playing" while staying silent — a
   // cross-origin iframe's autoplay can be blocked by the phone's browser
@@ -2006,110 +2020,70 @@ async function togglePlay(id){
   // is no way to detect that from here. A real <audio> tag has none of
   // that risk and is the one method already confirmed audible on iPhone,
   // so it now comes first for every track, verified ID or not):
-  //  1. An iTunes preview already resolved earlier this session for THIS
-  //     track — smoothest (single tap, no embed) and already verified.
-  //  2. A fresh iTunes Search API lookup, tried for EVERY track including
-  //     ones with a verified spotifyId/youtubeId. For those, the title and
-  //     artist used for the query are our own clean catalogue data (not
-  //     scraped/guessed text), so the match is high-confidence — and the
-  //     result is a real, branding-free 30s <audio> preview.
-  //  3. A Deezer Search lookup (via our own deezer-preview Edge Function,
-  //     since Deezer's API blocks direct browser calls) — only tried when
-  //     iTunes has no match. Deezer's catalogue covers more of the
-  //     underground/Beatport-exclusive electronic tracks that show up in
-  //     the genre charts than Apple Music does, so this catches a
-  //     meaningful share of what iTunes alone was missing.
-  //  4. A verified identifier (t.spotifyId / t.youtubeId) — used only when
+  //  1. An iTunes or Deezer preview already resolved earlier this session
+  //     for THIS track — smoothest (single tap, no embed) and already
+  //     verified.
+  //  2. Fresh iTunes Search + Deezer Search lookups, run IN PARALLEL (not
+  //     one after the other — a sequential iTunes-then-Deezer chain nearly
+  //     doubled the wait for any track neither one has, which is exactly
+  //     what made the AudioContext-unlock bug above easy to hit), tried for
+  //     EVERY track including ones with a verified spotifyId/youtubeId. For
+  //     those, the title/artist used for the query are our own clean
+  //     catalogue data (not scraped/guessed text), so a match is
+  //     high-confidence — and the result is a real, branding-free 30s
+  //     <audio> preview. iTunes wins if both happen to match.
+  //  3. A verified identifier (t.spotifyId / t.youtubeId) — used only when
   //     neither iTunes nor Deezer has a match for that exact title/artist.
   //     Still guaranteed-correct, but the Spotify hidden-controller path can
   //     be silent on some mobile browsers, so it's now the fallback rather
   //     than the first choice.
-  //  5. The generated placeholder loop, clearly labelled, as a last resort.
-  if(t.itunesPreviewUrl){
+  //  4. The generated placeholder loop, clearly labelled, as a last resort.
+  if(t.itunesPreviewUrl || t.deezerPreviewUrl){
     stopPlayback();
     state.playingId = id;
     state.playingItunes = true;
     updatePlayerUI();
     const el = ensureItunesAudioEl();
-    el.src = t.itunesPreviewUrl;
+    el.src = t.itunesPreviewUrl || t.deezerPreviewUrl;
     el.play().catch(()=>{});
     return;
   }
-  if(!t.itunesChecked){
+  if(!t.itunesChecked || !t.deezerChecked){
     // Prime the shared <audio> element with this exact tap's user gesture
-    // BEFORE the network lookup below — see ensureItunesAudioEl for why
-    // this is what makes the real preview actually audible on an iPhone,
-    // not just found.
+    // BEFORE the network lookups below — see ensureItunesAudioEl for why
+    // this is what makes a real preview actually audible on an iPhone, not
+    // just found.
     stopPlayback();
     state.playingId = id;
     state.itunesLoading = true;
     updatePlayerUI();
     const el = ensureItunesAudioEl();
     try{ el.src = SILENT_AUDIO_DATA_URI; el.play().catch(()=>{}); }catch(e){ /* priming is best-effort, fire-and-forget: some phones never settle this promise, and awaiting it was blocking ALL playback */ }
-    const hit = await lookupItunesPreview(t);
-    // Only lock this track to the generated preview for the rest of the
-    // session once Apple's answer is a confirmed negative (itunesCache has
-    // an entry for it). A network failure leaves itunesCache unset on
-    // purpose — t.itunesChecked stays false too, so the next tap gets a
-    // fresh attempt instead of being stuck because of a one-off hiccup.
+    const [itunesHit, deezerHit] = await Promise.all([
+      t.itunesChecked ? Promise.resolve(itunesCache[t.id] ?? null) : lookupItunesPreview(t),
+      t.deezerChecked ? Promise.resolve(deezerCache[t.id] ?? null) : lookupDeezerPreview(t),
+    ]);
+    // Only lock a source to the generated preview for the rest of the
+    // session once its answer is a confirmed negative (its cache has an
+    // entry for it). A network failure leaves that cache unset on purpose —
+    // t.itunesChecked/t.deezerChecked stay false too, so the next tap gets
+    // a fresh attempt instead of being stuck because of a one-off hiccup.
     if(itunesCache[t.id] !== undefined) t.itunesChecked = true;
+    if(deezerCache[t.id] !== undefined) t.deezerChecked = true;
     if(state.playingId !== id) return; // listener moved on during the lookup
     state.itunesLoading = false;
+    const hit = itunesHit || deezerHit; // iTunes wins when both found something
     if(hit && hit.previewUrl){
-      t.itunesPreviewUrl = hit.previewUrl;
-      t.itunesTrackUrl = hit.trackViewUrl;
+      if(itunesHit && itunesHit.previewUrl){ t.itunesPreviewUrl = itunesHit.previewUrl; t.itunesTrackUrl = itunesHit.trackViewUrl; }
+      else { t.deezerPreviewUrl = hit.previewUrl; }
       state.playingItunes = true;
       updatePlayerUI();
       el.src = hit.previewUrl;
       el.play().catch(()=>{});
       return;
     }
-    // No iTunes match: try Deezer next (see below), then spotifyId/youtubeId,
-    // then the generated loop as a last resort.
-  }
-  if(t.deezerPreviewUrl){
-    stopPlayback();
-    state.playingId = id;
-    state.playingItunes = true;
-    updatePlayerUI();
-    const el = ensureItunesAudioEl();
-    el.src = t.deezerPreviewUrl;
-    el.play().catch(()=>{});
-    return;
-  }
-  if(!t.deezerChecked){
-    // Deezer couvre souvent mieux les titres électroniques/underground issus
-    // de Beatport (fréquents dans les classements par genre) que le
-    // catalogue Apple Music interrogé juste au-dessus. On ne re-prime
-    // l'élément audio QUE si ce tap n'a pas déjà fait la tentative iTunes
-    // ci-dessus (state.playingId===id dans ce cas) — reprimer ici
-    // couperait net l'extrait iTunes qui vient peut-être de démarrer.
-    const alreadyPrimedThisTap = state.playingId === id;
-    const el = ensureItunesAudioEl();
-    if(!alreadyPrimedThisTap){
-      stopPlayback();
-      state.playingId = id;
-      try{ el.src = SILENT_AUDIO_DATA_URI; el.play().catch(()=>{}); }catch(e){ /* best-effort priming, see iTunes block above */ }
-    }
-    state.itunesLoading = true;
-    updatePlayerUI();
-    const hit = await lookupDeezerPreview(t);
-    // Même règle de cache qu'iTunes : seul un résultat complet (trouvé ou
-    // négatif confirmé) verrouille t.deezerChecked ; un échec réseau laisse
-    // la porte ouverte à un nouvel essai au prochain tap.
-    if(deezerCache[t.id] !== undefined) t.deezerChecked = true;
-    if(state.playingId !== id) return; // l'auditeur est passé à autre chose entretemps
-    state.itunesLoading = false;
-    if(hit && hit.previewUrl){
-      t.deezerPreviewUrl = hit.previewUrl;
-      state.playingItunes = true;
-      updatePlayerUI();
-      el.src = hit.previewUrl;
-      el.play().catch(()=>{});
-      return;
-    }
-    // Ni iTunes ni Deezer : on retombe sur spotifyId/youtubeId, puis la
-    // boucle générée en tout dernier recours.
+    // Neither iTunes nor Deezer: fall through to spotifyId/youtubeId, then
+    // the generated loop as a last resort.
   }
   if(t.spotifyId){
     // Lecture pilotée en coulisses via l'API Spotify (contrôleur caché,
@@ -2385,7 +2359,10 @@ function renderHome(){
     <div class="chiprow">
       <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
       <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
-      <div class="chip ${quickGenreActive('afro-tech')?'active':''}" data-action="quickgenre" data-g="afro-tech">${tr('home.chipAfroTech')}</div>
+      <!-- Afro Tech retiré : Beatport n'a pas de chart dédié pour ce genre,
+           donc il affichait toujours exactement les mêmes morceaux que Afro
+           House (voir sync-charts/index.ts, GENRE_CHART_TARGETS) — une
+           catégorie en double plutôt qu'un vrai contenu distinct. -->
       <div class="chip ${quickGenreActive('house')?'active':''}" data-action="quickgenre" data-g="house">${tr('home.chipHouse')}</div>
       <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
       <div class="chip ${quickGenreActive('techno')?'active':''}" data-action="quickgenre" data-g="techno">${tr('home.chipTechno')}</div>
