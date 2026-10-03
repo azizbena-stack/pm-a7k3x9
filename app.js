@@ -255,11 +255,17 @@ function realTrackMoveHTML(rank, prev){
 // de couleur sur les pochettes et (b) permettre aux chips de genre de filtrer la liste,
 // exactement comme Monde/Pays. Ce n'est PAS une donnée de genre réelle fournie par
 // Soundcharts : à ne jamais présenter comme telle ailleurs dans l'app.
+// Volontairement limité aux genres des chips rapides (et pas les 13 de GENRES) : un
+// classement ville réel n'a souvent que quelques dizaines de morceaux, donc répartir
+// sur seulement ces catégories évite de se retrouver avec 1 ou 2 morceaux à peine
+// quand on filtre sur un genre précis.
+const CITY_PSEUDO_GENRES = ['afro-house','afro-tech','house','melodic-house','melodic-techno','techno'];
 function cityTrackGenre(title, artist){
   const seedKey = (title||'')+'|'+(artist||'');
-  return GENRES[strSeed(seedKey) % GENRES.length].id;
+  return CITY_PSEUDO_GENRES[strSeed(seedKey) % CITY_PSEUDO_GENRES.length];
 }
-function renderRealTrackRow(entry, idx){
+const FREE_LIMIT_TRACKS = 20; // doit rester identique à freeLimit dans renderHome
+function renderRealTrackRow(entry, idx, locked){
   const t = entry.tracks || {};
   const seedKey = (t.title||'')+'|'+(t.artist_name||'');
   const rid = 'real-' + strSeed(seedKey+'|'+idx);
@@ -286,7 +292,7 @@ function renderRealTrackRow(entry, idx){
   };
   const t2 = realTracksCache[rid]; // normalized object (coverHTML/genreById expect this shape, same as Monde/Pays rows)
   return `
-  <div class="track-row" style="padding-left:0;">
+  <div class="track-row ${locked?'lock-row':''}" style="padding-left:0;">
     <div class="rank ${idx<3?'top3':''}">${idx<3? ['🥇','🥈','🥉'][idx] : (idx+1)}</div>
     ${coverHTML(t2,false)}
     <div class="t-info">
@@ -301,14 +307,15 @@ function realChartPlatformTabsHTML(action, selected){
     ${PLATFORMS_UI.map(p=>`<button class="${p===selected?'active':''}" data-action="${action}" data-p="${p}">${PLATFORM_LABEL[p]}</button>`).join('')}
   </div>`;
 }
-function realChartListHTML(entries){
+function realChartListHTML(entries, opts){
+  opts = opts || {};
   if(!entries.length) return `<div class="empty-msg">Pas encore de classement synchronisé pour cette ville/plateforme.</div>`;
   const filtered = entries.filter(e=>{
     const t = e.tracks || {};
     return trackMatchesGenreFilter({ genre: cityTrackGenre(t.title, t.artist_name) });
   });
   if(!filtered.length) return `<div class="empty-msg">Aucun morceau de ce classement ne correspond au genre sélectionné.</div>`;
-  return filtered.map((e,i)=>renderRealTrackRow(e,i)).join('');
+  return filtered.map((e,i)=>renderRealTrackRow(e,i, opts.freeLimit!=null && i>=opts.freeLimit)).join('');
 }
 
 /* ---------------------------- REAL CHART DATA -----------------------------
@@ -2067,13 +2074,14 @@ function renderHome(){
   </div>
 
   <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' '+cname(state.selectedCountry).toUpperCase():tr('home.topPrefix')+' '+cityById(state.selectedCity).name.toUpperCase()}</h2>
-    ${state.scope!=='city' && !isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}
+    ${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}
   </div>
   ${state.scope==='city' ? `
   <div class="track-list" id="homeCityList">
     <div class="empty-msg">Chargement…</div>
   </div>
-  <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>` : `
+  <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
+  ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : `
   <div class="track-list">
     ${list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)).join('')}
   </div>
@@ -2089,7 +2097,7 @@ async function loadHomeCityList(){
   const entries = await fetchRealCityChart(appCityId, platform, period);
   if(state.scope!=='city' || state.selectedCity!==appCityId || state.homeCityPlatform!==platform || state.cityPeriod!==period) return; // user moved on
   const host = document.getElementById('homeCityList');
-  if(host) host.innerHTML = realChartListHTML(entries);
+  if(host) host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS });
 }
 
 function renderTrackRow(t, idx, locked){
