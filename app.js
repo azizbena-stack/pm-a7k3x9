@@ -1742,7 +1742,7 @@ async function togglePlay(id){
   state.itunesLoading = true;
   updatePlayerUI();
   const el = ensureItunesAudioEl();
-  try{ el.src = SILENT_AUDIO_DATA_URI; await el.play(); el.pause(); }catch(e){ /* priming is best-effort — a real preview still plays if this fails, just possibly silently on iOS */ }
+  try{ el.src = SILENT_AUDIO_DATA_URI; el.play().catch(()=>{}); }catch(e){ /* priming is best-effort, fire-and-forget: some phones never settle this promise, and awaiting it was blocking ALL playback */ }
   const hit = await lookupItunesPreview(t);
   // Only lock this track to the generated preview for the rest of the
   // session once Apple's answer is a confirmed negative (itunesCache has an
