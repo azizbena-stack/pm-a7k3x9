@@ -177,21 +177,23 @@ function renderRealTrackRow(entry, idx){
     // timbre du kick inclus, pas juste l'habillage en arrière-plan.
     demoProfile: DEMO_PROFILES[idx % DEMO_PROFILES.length],
     demoBpm: DEMO_PROFILES[idx % DEMO_PROFILES.length].bpm,
-    // Found automatically by the sync job (YouTube search) — when present,
-    // tapping play streams the REAL song via YouTube's own embed player
-    // instead of the generated preview. null = not found yet, generated preview plays.
+    // Found automatically by the sync job (YouTube search) — kept only to
+    // offer a real video link from the track detail view. The quick tap-to-
+    // play button here always goes through the Apple Music preview /
+    // generated-loop pipeline instead (see togglePlay) — exactly like the
+    // Monde/Pays rows — because a YouTube iframe's autoplay cannot reliably
+    // follow this tap's gesture on mobile Safari.
     youtubeId: t.youtube_id || null,
   };
   const playing = state.playingId===rid;
   const cover = t.cover_url
     ? `<img src="${esc(t.cover_url)}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex:0 0 44px;" onerror="this.style.visibility='hidden'"/>`
     : `<div style="width:44px;height:44px;border-radius:10px;background:var(--card-2);flex:0 0 44px;"></div>`;
-  const youtubeBadge = t.youtube_id ? `<div style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#ff0033;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (YouTube)">▶</div>` : '';
   return `
   <div class="track-row" style="padding-left:0;">
     <div class="rank ${idx<3?'top3':''}">${idx<3? ['🥇','🥈','🥉'][idx] : (idx+1)}</div>
     <div class="cover-wrap" style="position:relative;">
-      ${cover}${youtubeBadge}
+      ${cover}
       <button class="play-overlay${playing?' playing':''}" data-action="toggle-play" data-id="${rid}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
     </div>
     <div class="t-info">
@@ -1426,7 +1428,7 @@ function coverHTML(t, big){
   // thumbnail URLs their site serves) — if it ever fails to load, the generative
   // artwork underneath shows through instead of a broken image.
   const img = t.coverUrl ? `<img src="${t.coverUrl}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;">` : '';
-  const spotifyBadge = t.youtubeId ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#ff0033;display:flex;align-items:center;justify-content:center;font-size:8px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (YouTube)">▶</div>` : (t.itunesPreviewUrl ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (Apple Music)">✓</div>` : '');
+  const spotifyBadge = t.itunesPreviewUrl ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="Extrait audio réel disponible (Apple Music)">✓</div>` : '';
   return `<div class="cover-wrap">
     <div class="cover${big?' lg':''}" style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
     <button class="play-overlay${big?' lg':''}${playing?' playing':''}" data-action="toggle-play" data-id="${t.id}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
@@ -1703,18 +1705,20 @@ async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   if(state.playingId===id){ stopPlayback(); return; }
-  // Priority: YouTube's official embed first (real song, already known, no
-  // extra lookup needed) — then Apple's free iTunes Search API (also a real
-  // 30s clip of the actual track) — then the generated preview if Apple
+  // Priority: Apple's free iTunes Search API first (a real 30s clip of the
+  // actual track, played through the primed <audio> element — reliable on
+  // iPhone, see ensureItunesAudioEl) — then the generated preview if Apple
   // genuinely has nothing for this track (a network failure during the
   // lookup does NOT count as "nothing" — see lookupItunesPreview).
-  if(t.youtubeId){
-    stopPlayback();
-    state.playingId = id;
-    state.playingReal = true;
-    updatePlayerUI();
-    return;
-  }
+  // NOTE: a YouTube video embed is intentionally NOT used for the quick tap-
+  // to-play action here, even when t.youtubeId is known (city charts synced
+  // from Soundcharts always have one). A cross-origin YouTube iframe's
+  // autoplay cannot reliably inherit this tap's user gesture on mobile
+  // Safari — the video stays paused until the person taps a second time
+  // inside the embed itself, which read as "le son ne marche pas" on
+  // iPhone even though it worked on desktop Safari's looser policy. The
+  // real YouTube video is still available to watch manually in the track's
+  // detail view further below.
   if(t.itunesPreviewUrl){
     stopPlayback();
     state.playingId = id;
@@ -1787,16 +1791,6 @@ function renderMiniPlayer(){
   if(!state.playingId) return '';
   const t = TRACKS.find(x=>x.id===state.playingId) || realTracksCache[state.playingId];
   if(!t) return '';
-  if(state.playingReal && t.youtubeId){
-    // Real track found via YouTube — played through YouTube's own official
-    // embed player (its branding/controls can't be hidden). Preferred over
-    // Apple Music once found.
-    return `
-    <div class="mini-player mini-player-spotify">
-      <iframe style="border-radius:10px;flex:1;min-width:0;" src="https://www.youtube.com/embed/${t.youtubeId}?autoplay=1" width="100%" height="80" frameborder="0" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="YouTube player — ${esc(t.title)}"></iframe>
-      <button data-action="mini-player-stop" title="Arrêter" style="flex:0 0 auto;">✕</button>
-    </div>`;
-  }
   if(state.itunesLoading){
     // Briefly shown while the on-demand Apple Music lookup is in flight
     // (usually well under a second).
@@ -2369,21 +2363,27 @@ function renderTrackOverlay(){
       </div>
 
       <div class="hpad">
-        ${t.youtubeId ? `
-          <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(255,0,51,.12);color:#ff0033;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeYoutube')}</div>
-          <iframe style="border-radius:12px;" src="https://www.youtube.com/embed/${t.youtubeId}" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="YouTube player — ${esc(t.title)}"></iframe>
-          <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteYoutube')}</div>
-        ` : t.itunesPreviewUrl ? `
+        ${t.itunesPreviewUrl ? `
           <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(252,61,98,.12);color:#fc3d62;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeApple')}</div>
           <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteApple')}${t.itunesTrackUrl ? ` · <a href="${t.itunesTrackUrl}" target="_blank" rel="noopener" style="color:#fc3d62;">${tr('track.appleMusic')}</a>` : ''}</div>
         ` : `
           <!-- No Apple Music preview found for this track — Spotify's
                widget is no longer used as a fallback, so this just plays
-               the generated preview. -->
+               the generated preview. Same button/behavior as every Monde/
+               Pays track (see togglePlay): tapping it always goes through
+               the primed <audio> element, never a YouTube iframe, so it
+               stays reliable on iPhone. -->
           <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${state.itunesLoading && state.playingId===t.id ? '…' : tr('track.audioGenNote')}</div>
         `}
+        ${t.youtubeId ? `
+          <div style="margin-top:10px;">
+            <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(255,0,51,.12);color:#ff0033;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeYoutube')}</div>
+            <iframe style="border-radius:12px;" src="https://www.youtube.com/embed/${t.youtubeId}" width="100%" height="152" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" loading="lazy" title="YouTube player — ${esc(t.title)}"></iframe>
+            <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteYoutube')}</div>
+          </div>
+        ` : ''}
       </div>
 
       <div class="hpad" style="margin-top:14px;">
@@ -2436,7 +2436,7 @@ function renderTrackOverlay(){
           ${t.label ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-top:1px solid var(--border-soft);"><span style="color:var(--text-muted);">${tr('track.label')}</span><span style="font-weight:700;">${esc(t.label)}</span></div>` : ''}
           ${t.chartRank ? `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-top:1px solid var(--border-soft);"><span style="color:var(--text-muted);">${tr('track.ranking')}</span><span style="font-weight:700;">${t.chartSource} ${esc(t.chartGenreName)} #${t.chartRank}</span></div>` : ''}
         </div>
-        ${t.chartRank ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5;">${tr('track.disclaimerBase')}${t.youtubeId ? tr('track.disclaimerYoutube') : (t.itunesPreviewUrl ? tr('track.disclaimerApple') : tr('track.disclaimerGenerated'))}${tr('track.disclaimerTail')}</div>` : ''}
+        ${t.chartRank ? `<div style="font-size:10px;color:var(--text-muted);margin-top:8px;line-height:1.5;">${tr('track.disclaimerBase')}${t.itunesPreviewUrl ? tr('track.disclaimerApple') : tr('track.disclaimerGenerated')}${tr('track.disclaimerTail')}</div>` : ''}
       </div>
 
       <div class="section-title"><h2>${tr('track.listenFull')}</h2></div>
