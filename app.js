@@ -1795,16 +1795,21 @@ function itunesHitMatches(queryTitle, queryArtist, hitTrackName, hitArtistName){
   const hTitle = normText(hitTrackName);
   const titleHits = qTitleWords.filter(w=>hTitle.includes(w)).length;
   const titleRatio = titleHits / qTitleWords.length;
-  // Crédits DJ multiples côté requête ("HUGEL, SOLTO (FR)") : on exige juste
-  // que le premier artiste cité apparaisse dans l'artiste du résultat Apple,
-  // pas la liste complète (Apple ne les cite pas toujours tous non plus).
+  // Crédits DJ multiples côté requête ("HUGEL, SOLTO (FR)") : on exige qu'AU
+  // MOINS UN des artistes cités apparaisse dans l'artiste du résultat Apple
+  // — pas forcément le premier, Apple ne crédite pas toujours dans le même
+  // ordre que Beatport, ni la liste complète. On enlève aussi les tags style
+  // "(FR)"/"(NL)" qui ne font pas partie du vrai nom d'artiste.
   // minLen=2 (pas 3) : beaucoup de pseudos DJ sont courts ou numériques
   // ("19:26", "ANOTR") — testé et corrigé après avoir trouvé qu'un artiste
   // purement numérique passait inaperçu et laissait n'importe quel résultat
   // du même titre générique passer sans vérification d'artiste.
-  const leadArtistWords = sigWords((queryArtist||'').split(/[,&]/)[0], 2);
+  const artistTokens = (queryArtist||'').split(/[,&]/)
+    .map(a=>a.replace(/\s*[\(\[][^\)\]]*[\)\]]\s*/g,'').trim())
+    .filter(Boolean);
+  const artistWords = artistTokens.length ? artistTokens.flatMap(a=>sigWords(a,2)) : sigWords(queryArtist||'',2);
   const hArtist = normText(hitArtistName);
-  const artistOk = leadArtistWords.length===0 || leadArtistWords.some(w=>hArtist.includes(w));
+  const artistOk = artistWords.length===0 || artistWords.some(w=>hArtist.includes(w));
   return titleRatio >= 0.6 && artistOk;
 }
 async function itunesSearchOnce(term){
@@ -1816,7 +1821,7 @@ async function itunesSearchOnce(term){
   const timer = controller ? setTimeout(()=>controller.abort(), 6000) : null;
   try{
     const q = encodeURIComponent(term);
-    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`, controller ? {signal: controller.signal} : {});
+    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=10`, controller ? {signal: controller.signal} : {});
     if(!res.ok) return {ok:false};
     const data = await res.json();
     const results = (data && Array.isArray(data.results)) ? data.results : [];
@@ -1838,12 +1843,30 @@ async function lookupItunesPreview(t){
   // highest-value attempt gets one retry if it fails outright (vs. simply
   // finding no result) — on a flaky mobile connection that one retry is
   // often the difference between a real preview and the generated fallback.
-  const cleanTitle = t.title.replace(/\s*\([^)]*\)\s*$/,'').trim() || t.title;
-  const leadArtist = (t.artist||'').split(/[,&]/)[0].trim();
+  // Enlève TOUS les groupes "(...)" / "[...]" en fin de titre, pas juste le
+  // dernier — "Jamaican (Bam Bam) (Extended Mix)" avait avant seulement
+  // "(Extended Mix)" retiré ; on boucle maintenant pour aussi retirer
+  // "(Bam Bam)" si besoin. Enlève aussi un suffixe "- Extended Mix" / "-
+  // Radio Edit" etc. qui n'est pas entre parenthèses chez certains labels.
+  let cleanTitle = t.title;
+  let prevTitle;
+  do{
+    prevTitle = cleanTitle;
+    cleanTitle = cleanTitle.replace(/\s*[\(\[][^\)\]]*[\)\]]\s*$/,'').trim();
+  }while(cleanTitle && cleanTitle !== prevTitle);
+  cleanTitle = cleanTitle.replace(/\s*-\s*(extended|radio|original|club|vip|remix|edit|mix)\b.*$/i,'').trim();
+  if(!cleanTitle) cleanTitle = t.title;
+  const artistList = (t.artist||'').split(/[,&]/).map(a=>a.replace(/\s*[\(\[][^\)\]]*[\)\]]\s*/g,'').trim()).filter(Boolean);
+  const leadArtist = artistList[0] || (t.artist||'').trim();
   const attempts = [
     `${t.title} ${t.artist}`,
     cleanTitle !== t.title || leadArtist !== t.artist ? `${cleanTitle} ${leadArtist}` : null,
     cleanTitle !== t.title ? cleanTitle : null,
+    // Beatport cite parfois les artistes dans un ordre différent de celui
+    // retenu par Apple : on retente avec chaque autre artiste crédité avant
+    // de renoncer (plafonné à 3 au total pour ne pas multiplier les requêtes
+    // sur un morceau à 6 featurings).
+    ...artistList.slice(1,3).map(a => `${cleanTitle} ${a}`),
   ].filter(Boolean);
   let hit = null, anyFailed = false;
   for(let i=0;i<attempts.length;i++){
