@@ -1750,6 +1750,16 @@ function stopPlayback(){
 // preview is always shown next to a link to open the track in Apple Music
 // (see renderMiniPlayer / track overlay).
 const itunesCache = {};
+// Deezer en repli : certains titres électroniques/underground issus de
+// Beatport n'existent pas dans le catalogue Apple Music (recherche iTunes
+// ci-dessus) mais existent chez Deezer, qui couvre souvent mieux ce
+// répertoire. L'API Deezer n'autorise pas les appels directs depuis le
+// navigateur (pas d'en-tête CORS) donc on passe par notre propre fonction
+// serveur deezer-preview qui fait l'appel à notre place et renvoie
+// uniquement { preview, trackTitle, artistName }. Même règle de cache que
+// pour iTunes : null = "vraiment rien trouvé", undefined = "pas encore
+// cherché".
+const deezerCache = {};
 // A silent ~0s WAV, used only to "prime" the shared <audio> element below —
 // see ensureItunesAudioEl for why.
 const SILENT_AUDIO_DATA_URI = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
@@ -1966,6 +1976,25 @@ async function lookupItunesPreview(t){
   itunesCache[key] = null; // every attempt completed and genuinely found nothing — a real, cacheable negative
   return null;
 }
+async function lookupDeezerPreview(t){
+  const key = t.id;
+  if(deezerCache[key] !== undefined) return deezerCache[key];
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(()=>controller.abort(), 6000) : null;
+  try{
+    const q = `title=${encodeURIComponent(t.title)}&artist=${encodeURIComponent(t.artist||'')}`;
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/deezer-preview?${q}`, {
+      headers: SUPABASE_HEADERS,
+      ...(controller ? {signal: controller.signal} : {})
+    });
+    if(!res.ok){ return null; } // transient failure — leave uncached so the next tap retries
+    const data = await res.json();
+    const hit = (data && data.preview) ? { previewUrl: data.preview, trackViewUrl: null } : null;
+    deezerCache[key] = hit; // a completed request, hit or genuine miss, is cacheable either way
+    return hit;
+  }catch(e){ return null; /* network/timeout error — not a confirmed absence, stays uncached */ }
+  finally{ if(timer) clearTimeout(timer); }
+}
 async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
@@ -1984,12 +2013,18 @@ async function togglePlay(id){
   //     artist used for the query are our own clean catalogue data (not
   //     scraped/guessed text), so the match is high-confidence — and the
   //     result is a real, branding-free 30s <audio> preview.
-  //  3. A verified identifier (t.spotifyId / t.youtubeId) — used only when
-  //     iTunes genuinely has no match for that exact title/artist. Still
-  //     guaranteed-correct, but the Spotify hidden-controller path can be
-  //     silent on some mobile browsers, so it's now the fallback rather
+  //  3. A Deezer Search lookup (via our own deezer-preview Edge Function,
+  //     since Deezer's API blocks direct browser calls) — only tried when
+  //     iTunes has no match. Deezer's catalogue covers more of the
+  //     underground/Beatport-exclusive electronic tracks that show up in
+  //     the genre charts than Apple Music does, so this catches a
+  //     meaningful share of what iTunes alone was missing.
+  //  4. A verified identifier (t.spotifyId / t.youtubeId) — used only when
+  //     neither iTunes nor Deezer has a match for that exact title/artist.
+  //     Still guaranteed-correct, but the Spotify hidden-controller path can
+  //     be silent on some mobile browsers, so it's now the fallback rather
   //     than the first choice.
-  //  4. The generated placeholder loop, clearly labelled, as a last resort.
+  //  5. The generated placeholder loop, clearly labelled, as a last resort.
   if(t.itunesPreviewUrl){
     stopPlayback();
     state.playingId = id;
@@ -2029,8 +2064,52 @@ async function togglePlay(id){
       el.play().catch(()=>{});
       return;
     }
-    // No iTunes match: fall through below to try spotifyId/youtubeId, then
-    // the generated loop as a last resort.
+    // No iTunes match: try Deezer next (see below), then spotifyId/youtubeId,
+    // then the generated loop as a last resort.
+  }
+  if(t.deezerPreviewUrl){
+    stopPlayback();
+    state.playingId = id;
+    state.playingItunes = true;
+    updatePlayerUI();
+    const el = ensureItunesAudioEl();
+    el.src = t.deezerPreviewUrl;
+    el.play().catch(()=>{});
+    return;
+  }
+  if(!t.deezerChecked){
+    // Deezer couvre souvent mieux les titres électroniques/underground issus
+    // de Beatport (fréquents dans les classements par genre) que le
+    // catalogue Apple Music interrogé juste au-dessus. On ne re-prime
+    // l'élément audio QUE si ce tap n'a pas déjà fait la tentative iTunes
+    // ci-dessus (state.playingId===id dans ce cas) — reprimer ici
+    // couperait net l'extrait iTunes qui vient peut-être de démarrer.
+    const alreadyPrimedThisTap = state.playingId === id;
+    const el = ensureItunesAudioEl();
+    if(!alreadyPrimedThisTap){
+      stopPlayback();
+      state.playingId = id;
+      try{ el.src = SILENT_AUDIO_DATA_URI; el.play().catch(()=>{}); }catch(e){ /* best-effort priming, see iTunes block above */ }
+    }
+    state.itunesLoading = true;
+    updatePlayerUI();
+    const hit = await lookupDeezerPreview(t);
+    // Même règle de cache qu'iTunes : seul un résultat complet (trouvé ou
+    // négatif confirmé) verrouille t.deezerChecked ; un échec réseau laisse
+    // la porte ouverte à un nouvel essai au prochain tap.
+    if(deezerCache[t.id] !== undefined) t.deezerChecked = true;
+    if(state.playingId !== id) return; // l'auditeur est passé à autre chose entretemps
+    state.itunesLoading = false;
+    if(hit && hit.previewUrl){
+      t.deezerPreviewUrl = hit.previewUrl;
+      state.playingItunes = true;
+      updatePlayerUI();
+      el.src = hit.previewUrl;
+      el.play().catch(()=>{});
+      return;
+    }
+    // Ni iTunes ni Deezer : on retombe sur spotifyId/youtubeId, puis la
+    // boucle générée en tout dernier recours.
   }
   if(t.spotifyId){
     // Lecture pilotée en coulisses via l'API Spotify (contrôleur caché,
