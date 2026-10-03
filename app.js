@@ -1757,6 +1757,35 @@ function ensureItunesAudioEl(){
 // is NOT the same thing and must never be cached as a permanent "no match"
 // (see lookupItunesPreview below — this is what was silently conflating a
 // one-off mobile network hiccup with a confirmed absence on Apple Music).
+// Bug trouvé le 2026-10-03 (soir) : l'appel iTunes ne récupérait QUE le tout
+// premier résultat (limit=1) et le jouait sans jamais vérifier qu'il
+// correspondait réellement au titre/artiste cherché — le classement de
+// pertinence d'Apple se trompe souvent sur des titres de club courts/génériques
+// ou des crédits DJ multiples, donc l'extrait joué pouvait être un morceau
+// complètement différent de celui affiché ("les musiques ne correspondent
+// pas"). Corrigé en récupérant plusieurs candidats (limit=5) et en ne gardant
+// que celui dont le titre ET l'artiste ressemblent vraiment à ce qu'on
+// cherchait (voir itunesHitMatches) ; si aucun des 5 ne correspond vraiment,
+// on considère qu'Apple n'a rien (on passe à la tentative suivante, puis à
+// l'extrait généré) plutôt que de jouer un morceau au hasard.
+function normText(s){
+  return (s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
+}
+function sigWords(s){ return normText(s).split(' ').filter(w=>w.length>=3); }
+function itunesHitMatches(queryTitle, queryArtist, hitTrackName, hitArtistName){
+  const qTitleWords = sigWords(queryTitle);
+  if(!qTitleWords.length) return false;
+  const hTitle = normText(hitTrackName);
+  const titleHits = qTitleWords.filter(w=>hTitle.includes(w)).length;
+  const titleRatio = titleHits / qTitleWords.length;
+  // Crédits DJ multiples côté requête ("HUGEL, SOLTO (FR)") : on exige juste
+  // que le premier artiste cité apparaisse dans l'artiste du résultat Apple,
+  // pas la liste complète (Apple ne les cite pas toujours tous non plus).
+  const leadArtistWords = sigWords((queryArtist||'').split(',')[0]);
+  const hArtist = normText(hitArtistName);
+  const artistOk = leadArtistWords.length===0 || leadArtistWords.some(w=>hArtist.includes(w));
+  return titleRatio >= 0.6 && artistOk;
+}
 async function itunesSearchOnce(term){
   // Mobile connections are more prone to a slow/stalled request than desktop
   // wifi — cap each attempt at 6s so a bad network degrades to the next
@@ -1766,11 +1795,11 @@ async function itunesSearchOnce(term){
   const timer = controller ? setTimeout(()=>controller.abort(), 6000) : null;
   try{
     const q = encodeURIComponent(term);
-    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=1`, controller ? {signal: controller.signal} : {});
+    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=5`, controller ? {signal: controller.signal} : {});
     if(!res.ok) return {ok:false};
     const data = await res.json();
-    const hit = data && Array.isArray(data.results) ? data.results[0] : null;
-    return {ok:true, hit: (hit && hit.previewUrl) ? { previewUrl: hit.previewUrl, trackViewUrl: hit.trackViewUrl || null } : null};
+    const results = (data && Array.isArray(data.results)) ? data.results : [];
+    return {ok:true, results};
   }catch(e){ return {ok:false}; /* network/timeout/CORS error — not a confirmed absence */ }
   finally{ if(timer) clearTimeout(timer); }
 }
@@ -1800,7 +1829,8 @@ async function lookupItunesPreview(t){
     let r = await itunesSearchOnce(attempts[i]);
     if(!r.ok && i===0) r = await itunesSearchOnce(attempts[i]); // one retry, exact query only
     if(!r.ok){ anyFailed = true; continue; }
-    if(r.hit){ hit = r.hit; break; }
+    const match = (r.results||[]).find(res => res.previewUrl && itunesHitMatches(t.title, t.artist, res.trackName, res.artistName));
+    if(match){ hit = { previewUrl: match.previewUrl, trackViewUrl: match.trackViewUrl || null }; break; }
   }
   if(hit){ itunesCache[key] = hit; return hit; }
   if(anyFailed) return null; // transient failure — leave uncached so the next tap retries
