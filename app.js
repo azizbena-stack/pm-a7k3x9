@@ -64,6 +64,24 @@ const COUNTRIES = [
   {code:'MX', name:'Mexique', flag:'🇲🇽'},
   {code:'MA', name:'Maroc', flag:'🇲🇦'},
   {code:'NL', name:'Pays-Bas', flag:'🇳🇱'},
+  {code:'BE', name:'Belgique', flag:'🇧🇪'},
+  {code:'HR', name:'Croatie', flag:'🇭🇷'},
+  {code:'CH', name:'Suisse', flag:'🇨🇭'},
+  {code:'AT', name:'Autriche', flag:'🇦🇹'},
+  {code:'SE', name:'Suède', flag:'🇸🇪'},
+  {code:'TR', name:'Turquie', flag:'🇹🇷'},
+  {code:'TN', name:'Tunisie', flag:'🇹🇳'},
+  {code:'LB', name:'Liban', flag:'🇱🇧'},
+  {code:'EG', name:'Égypte', flag:'🇪🇬'},
+  {code:'AR', name:'Argentine', flag:'🇦🇷'},
+  {code:'CO', name:'Colombie', flag:'🇨🇴'},
+  {code:'TH', name:'Thaïlande', flag:'🇹🇭'},
+  {code:'ID', name:'Indonésie', flag:'🇮🇩'},
+  {code:'IN', name:'Inde', flag:'🇮🇳'},
+  {code:'AU', name:'Australie', flag:'🇦🇺'},
+  {code:'CA', name:'Canada', flag:'🇨🇦'},
+  {code:'JP', name:'Japon', flag:'🇯🇵'},
+  {code:'IE', name:'Irlande', flag:'🇮🇪'},
 ];
 const countryByCode = c => COUNTRIES.find(x=>x.code===c);
 
@@ -87,6 +105,29 @@ const CITIES = [
   {id:'tulum', name:'Tulum', country:'MX'},
   {id:'marrakech', name:'Marrakech', country:'MA'},
   {id:'amsterdam', name:'Amsterdam', country:'NL'},
+  // Villes ajoutées pour couvrir les nouveaux pays — pas encore synchronisées
+  // en direct via Soundcharts (voir APP_CITY_TO_DB_NAME / REAL_CITIES plus
+  // bas) : elles alimentent le classement simulé Monde/Pays mais ne peuvent
+  // pas apparaître dans le sélecteur "Ville" tant qu'un vrai flux de données
+  // n'existe pas pour elles.
+  {id:'bruxelles', name:'Bruxelles', country:'BE'},
+  {id:'zrce', name:'Zrce', country:'HR'},
+  {id:'zurich', name:'Zurich', country:'CH'},
+  {id:'vienne', name:'Vienne', country:'AT'},
+  {id:'stockholm', name:'Stockholm', country:'SE'},
+  {id:'istanbul', name:'Istanbul', country:'TR'},
+  {id:'hammamet', name:'Hammamet', country:'TN'},
+  {id:'beyrouth', name:'Beyrouth', country:'LB'},
+  {id:'elgouna', name:'El Gouna', country:'EG'},
+  {id:'buenosaires', name:'Buenos Aires', country:'AR'},
+  {id:'medellin', name:'Medellín', country:'CO'},
+  {id:'phuket', name:'Phuket', country:'TH'},
+  {id:'bali', name:'Bali', country:'ID'},
+  {id:'goa', name:'Goa', country:'IN'},
+  {id:'sydney', name:'Sydney', country:'AU'},
+  {id:'montreal', name:'Montréal', country:'CA'},
+  {id:'tokyo', name:'Tokyo', country:'JP'},
+  {id:'dublin', name:'Dublin', country:'IE'},
 ];
 const cityById = id => CITIES.find(c=>c.id===id);
 
@@ -109,6 +150,12 @@ const APP_CITY_TO_DB_NAME = {
   saopaulo:'Sao Paulo', capetown:'Cape Town', johannesburg:'Johannesburg', milan:'Milan',
   berlin:'Berlin', lisbon:'Lisbon', tulum:'Tulum', marrakech:'Marrakech', amsterdam:'Amsterdam',
 };
+// Sous-ensemble de CITIES qui a un vrai flux Soundcharts (clé présente dans
+// APP_CITY_TO_DB_NAME) — c'est cette liste, et seulement elle, qui doit
+// alimenter le sélecteur "Ville" et l'onglet "Ville" d'Explore : les
+// nouvelles villes ajoutées pour les pays supplémentaires n'ont pas de vrai
+// classement et ne doivent jamais y apparaître.
+const REAL_CITIES = CITIES.filter(c => !!APP_CITY_TO_DB_NAME[c.id]);
 const PLATFORM_LABEL = { apple_music:'Apple Music', spotify:'Spotify', shazam:'Shazam' };
 const PLATFORMS_UI = ['apple_music', 'spotify', 'shazam'];
 
@@ -128,9 +175,14 @@ async function getDbCityId(appCityId){
 }
 
 const realTracksCache = {}; // synthetic-id -> track-like object, so real chart rows can use the same play engine
-const realChartCache = {}; // `${appCityId}:${platform}` -> entries array (session-only)
-async function fetchRealCityChart(appCityId, platform){
-  const key = appCityId+':'+platform;
+const realChartCache = {}; // `${appCityId}:${platform}:${period}` -> entries array (session-only)
+// period: 'today' (comparaison au jour précédent, fournie directement par Soundcharts
+// via previous_rank) | '7d' | '30d' (on recalcule alors le classement d'il y a 7/30
+// jours à partir d'un second instantané et on compare les morceaux par titre+artiste,
+// puisque leur identifiant peut changer d'un instantané à l'autre).
+async function fetchRealCityChart(appCityId, platform, period){
+  period = period || 'today';
+  const key = appCityId+':'+platform+':'+period;
   if(realChartCache[key]) return realChartCache[key];
   const dbCityId = await getDbCityId(appCityId);
   if(!dbCityId){ realChartCache[key] = []; return []; }
@@ -146,9 +198,45 @@ async function fetchRealCityChart(appCityId, platform){
       `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${latestDate}&select=rank,previous_rank,tracks(title,artist_name,cover_url,youtube_id)&order=rank.asc&limit=30`,
       { headers: SUPABASE_HEADERS }
     );
-    const entries = await entriesRes.json();
-    realChartCache[key] = entries || [];
-    return realChartCache[key];
+    let entries = await entriesRes.json();
+    entries = entries || [];
+
+    if(period!=='today' && entries.length){
+      const daysAgo = period==='30d' ? 30 : 7;
+      const targetDate = new Date(new Date(latestDate).getTime() - daysAgo*86400000).toISOString();
+      const histDateRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=lte.${targetDate}&select=captured_at&order=captured_at.desc&limit=1`,
+        { headers: SUPABASE_HEADERS }
+      );
+      const histDateRows = await histDateRes.json();
+      let histMap = null;
+      if(histDateRows && histDateRows.length){
+        const histDate = histDateRows[0].captured_at;
+        const histRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${histDate}&select=rank,tracks(title,artist_name)`,
+          { headers: SUPABASE_HEADERS }
+        );
+        const histEntries = await histRes.json();
+        histMap = {};
+        (histEntries||[]).forEach(h=>{
+          const t = h.tracks || {};
+          const k = (t.title||'').toLowerCase().trim()+'|'+(t.artist_name||'').toLowerCase().trim();
+          histMap[k] = h.rank;
+        });
+      }
+      // Remplace previous_rank par le rang d'il y a 7/30 jours (ou null si on n'a pas
+      // encore assez d'historique synchronisé pour remonter aussi loin, ou si le
+      // morceau n'était pas dans le classement à cette date).
+      entries = entries.map(e=>{
+        const t = e.tracks || {};
+        const k = (t.title||'').toLowerCase().trim()+'|'+(t.artist_name||'').toLowerCase().trim();
+        const histRank = histMap ? (histMap[k]!=null ? histMap[k] : null) : null;
+        return Object.assign({}, e, { previous_rank: histRank });
+      });
+    }
+
+    realChartCache[key] = entries;
+    return entries;
   } catch(e){
     realChartCache[key] = [];
     return [];
@@ -522,6 +610,7 @@ const state = {
   selectedCountry: 'ES',
   selectedCity: 'ibiza',
   period: '7d', // today|7d|30d
+  cityPeriod: 'today', // today|7d|30d — période de comparaison pour le classement réel "Ville"
   genreFilters: new Set(), // empty = all
   trendingPeriod: '7d',
   exploreMode: 'country', // country | city
@@ -1924,8 +2013,13 @@ function renderHome(){
       </select>` : ''}
     ${state.scope==='city' ? `
       <select class="chip-select" data-action="select-city" style="margin-top:9px;width:100%;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:12.5px;font-weight:700;">
-        ${CITIES.map(c=>`<option value="${c.id}" ${c.id===state.selectedCity?'selected':''}>${countryByCode(c.country).flag} ${c.name}</option>`).join('')}
-      </select>` : `
+        ${REAL_CITIES.map(c=>`<option value="${c.id}" ${c.id===state.selectedCity?'selected':''}>${countryByCode(c.country).flag} ${c.name}</option>`).join('')}
+      </select>
+    <div class="segmented" style="margin-top:9px;">
+      <button class="${state.cityPeriod==='today'?'active':''}" data-action="city-period" data-period="today">${tr('home.periodToday')}</button>
+      <button class="${state.cityPeriod==='7d'?'active':''}" data-action="city-period" data-period="7d">${tr('home.period7d')}</button>
+      <button class="${state.cityPeriod==='30d'?'active':''}" data-action="city-period" data-period="30d">${tr('home.period30d')}</button>
+    </div>` : `
     <div class="segmented" style="margin-top:9px;">
       <button class="${state.period==='today'?'active':''}" data-action="period" data-period="today">${tr('home.periodToday')}</button>
       <button class="${state.period==='7d'?'active':''}" data-action="period" data-period="7d">${tr('home.period7d')}</button>
@@ -1975,8 +2069,9 @@ async function loadHomeCityList(){
   if(state.scope!=='city') return;
   const appCityId = state.selectedCity;
   const platform = state.homeCityPlatform || 'spotify';
-  const entries = await fetchRealCityChart(appCityId, platform);
-  if(state.scope!=='city' || state.selectedCity!==appCityId || state.homeCityPlatform!==platform) return; // user moved on
+  const period = state.cityPeriod || 'today';
+  const entries = await fetchRealCityChart(appCityId, platform, period);
+  if(state.scope!=='city' || state.selectedCity!==appCityId || state.homeCityPlatform!==platform || state.cityPeriod!==period) return; // user moved on
   const host = document.getElementById('homeCityList');
   if(host) host.innerHTML = realChartListHTML(entries);
 }
@@ -2060,7 +2155,7 @@ function renderNextBig(){
    ============================================================================ */
 function renderExplore(){
   const mode = state.exploreMode;
-  const items = mode==='country' ? COUNTRIES : CITIES;
+  const items = mode==='country' ? COUNTRIES : REAL_CITIES;
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('explore.title')}</div></div>
@@ -2795,6 +2890,7 @@ document.addEventListener('click', async (e)=>{
   else if(a==='scope'){ state.scope = el.dataset.scope; renderView(); }
   else if(a==='home-city-platform'){ state.homeCityPlatform = el.dataset.p; renderView(); }
   else if(a==='period'){ state.period = el.dataset.period; renderView(); }
+  else if(a==='city-period'){ state.cityPeriod = el.dataset.period; renderView(); }
   else if(a==='quickgenre'){ setQuickGenre(el.dataset.g); }
   else if(a==='open-genre-sheet'){ openGenreSheet(); }
   else if(a==='close-genre-sheet'){ document.getElementById('genreOverlay').classList.add('hidden'); renderView(); }
