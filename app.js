@@ -248,21 +248,29 @@ function realTrackMoveHTML(rank, prev){
   if(prev > rank) return `<span class="t-trend up">▲ ${prev-rank}</span>`;
   return `<span class="t-trend down">▼ ${rank-prev}</span>`;
 }
-// Soundcharts ne fournit aucun genre réel par morceau pour les classements "Ville"
-// (contrairement au catalogue simulé Monde/Pays). On assigne donc un genre de façon
-// déterministe à partir du titre+artiste — toujours le même morceau = toujours le même
-// genre, jamais tiré au hasard à chaque rendu — uniquement pour (a) varier la pastille
-// de couleur sur les pochettes et (b) permettre aux chips de genre de filtrer la liste,
-// exactement comme Monde/Pays. Ce n'est PAS une donnée de genre réelle fournie par
-// Soundcharts : à ne jamais présenter comme telle ailleurs dans l'app.
-// Volontairement limité aux genres des chips rapides (et pas les 13 de GENRES) : un
-// classement ville réel n'a souvent que quelques dizaines de morceaux, donc répartir
-// sur seulement ces catégories évite de se retrouver avec 1 ou 2 morceaux à peine
-// quand on filtre sur un genre précis.
+// IMPORTANT — leçon retenue : Soundcharts ne fournit AUCUN genre réel par morceau
+// pour les classements "Ville" (contrairement au catalogue simulé Monde/Pays). Une
+// version précédente assignait un genre inventé (déterministe mais faux), l'affichait
+// et s'en servait pour filtrer — ça a produit des titres reggaeton/latin trap étiquetés
+// "Techno", confirmé par capture vidéo. C'était la mauvaise approche : on ne doit
+// jamais présenter une donnée fabriquée comme si elle venait de Soundcharts.
+// cityTrackGenre() reste UNIQUEMENT pour varier la couleur/texture de la pochette
+// (coverStyle) — jamais affiché en texte, jamais utilisé pour filtrer la liste Ville.
 const CITY_PSEUDO_GENRES = ['afro-house','afro-tech','house','melodic-house','melodic-techno','techno'];
 function cityTrackGenre(title, artist){
   const seedKey = (title||'')+'|'+(artist||'');
   return CITY_PSEUDO_GENRES[strSeed(seedKey) % CITY_PSEUDO_GENRES.length];
+}
+// Le job de sync Soundcharts peut laisser une entrée dont le titre n'a pas encore
+// été résolu (placeholder côté base, ex. "Track Loading..."). Ne jamais afficher ça
+// comme si c'était un vrai titre de morceau — on filtre ces entrées de la liste.
+function isPlaceholderTitle(title){
+  if(!title) return true;
+  const s = String(title).trim();
+  if(!s) return true;
+  if(/loading/i.test(s)) return true;
+  if(/^(unknown|inconnu|n\/a|untitled|sans titre)$/i.test(s)) return true;
+  return false;
 }
 const FREE_LIMIT_TRACKS = 20; // doit rester identique à freeLimit dans renderHome
 function renderRealTrackRow(entry, idx, locked){
@@ -271,11 +279,12 @@ function renderRealTrackRow(entry, idx, locked){
   const rid = 'real-' + strSeed(seedKey+'|'+idx);
   realTracksCache[rid] = {
     id: rid,
+    isRealCity: true, // marque une entrée de classement ville réel : jamais de genre inventé affiché
     title: t.title || 'Titre inconnu',
     artist: t.artist_name || '',
     coverUrl: t.cover_url || null,
     coverSeed: strSeed(seedKey) % 9999,
-    genre: cityTrackGenre(t.title, t.artist_name), // voir cityTrackGenre ci-dessus — assignation déterministe, pas une vraie donnée Soundcharts
+    genre: cityTrackGenre(t.title, t.artist_name), // cosmétique uniquement (couleur pochette) — voir note ci-dessus, jamais affiché/filtré
     // profil démo assigné en tournant sur la position dans la liste (pas par hasard) :
     // deux morceaux voisins dans le classement n'ont jamais le même profil, et ces
     // profils sont volontairement très contrastés (voir DEMO_PROFILES) — tempo,
@@ -297,7 +306,7 @@ function renderRealTrackRow(entry, idx, locked){
     ${coverHTML(t2,false)}
     <div class="t-info">
       <div class="t-title">${esc(t2.title)}</div>
-      <div class="t-sub"><span class="genre-dot" style="background:${genreById(t2.genre).color}"></span>${esc(t2.artist)} · ${genreById(t2.genre).name}</div>
+      <div class="t-sub">${esc(t2.artist)}</div>
     </div>
     <div class="t-right">${realTrackMoveHTML(entry.rank, entry.previous_rank)}</div>
   </div>`;
@@ -310,11 +319,15 @@ function realChartPlatformTabsHTML(action, selected){
 function realChartListHTML(entries, opts){
   opts = opts || {};
   if(!entries.length) return `<div class="empty-msg">Pas encore de classement synchronisé pour cette ville/plateforme.</div>`;
+  // Pas de filtre par genre ici : Soundcharts ne donne pas de genre réel par morceau
+  // pour les classements ville (voir note au-dessus de cityTrackGenre). On filtre en
+  // revanche les entrées dont le titre n'a pas encore été résolu par le job de sync
+  // (placeholder type "Track Loading...") — ne jamais montrer ça comme un vrai titre.
   const filtered = entries.filter(e=>{
     const t = e.tracks || {};
-    return trackMatchesGenreFilter({ genre: cityTrackGenre(t.title, t.artist_name) });
+    return !isPlaceholderTitle(t.title);
   });
-  if(!filtered.length) return `<div class="empty-msg">Aucun morceau de ce classement ne correspond au genre sélectionné.</div>`;
+  if(!filtered.length) return `<div class="empty-msg">Classement en cours de synchronisation, revenez dans quelques minutes.</div>`;
   return filtered.map((e,i)=>renderRealTrackRow(e,i, opts.freeLimit!=null && i>=opts.freeLimit)).join('');
 }
 
@@ -1785,7 +1798,7 @@ function itunesHitMatches(queryTitle, queryArtist, hitTrackName, hitArtistName){
   // ("19:26", "ANOTR") — testé et corrigé après avoir trouvé qu'un artiste
   // purement numérique passait inaperçu et laissait n'importe quel résultat
   // du même titre générique passer sans vérification d'artiste.
-  const leadArtistWords = sigWords((queryArtist||'').split(',')[0], 2);
+  const leadArtistWords = sigWords((queryArtist||'').split(/[,&]/)[0], 2);
   const hArtist = normText(hitArtistName);
   const artistOk = leadArtistWords.length===0 || leadArtistWords.some(w=>hArtist.includes(w));
   return titleRatio >= 0.6 && artistOk;
@@ -1822,7 +1835,7 @@ async function lookupItunesPreview(t){
   // finding no result) — on a flaky mobile connection that one retry is
   // often the difference between a real preview and the generated fallback.
   const cleanTitle = t.title.replace(/\s*\([^)]*\)\s*$/,'').trim() || t.title;
-  const leadArtist = (t.artist||'').split(',')[0].trim();
+  const leadArtist = (t.artist||'').split(/[,&]/)[0].trim();
   const attempts = [
     `${t.title} ${t.artist}`,
     cleanTitle !== t.title || leadArtist !== t.artist ? `${cleanTitle} ${leadArtist}` : null,
@@ -1952,7 +1965,7 @@ function renderMiniPlayer(){
       <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
       <div class="mp-info">
         <div class="mp-title">${esc(t.title)}</div>
-        <div class="mp-artist">${esc(t.artist)} · <span style="color:${g2.color};">${g2.name}</span> · extrait réel Apple Music</div>
+        <div class="mp-artist">${esc(t.artist)}${t.isRealCity?'':` · <span style="color:${g2.color};">${g2.name}</span>`} · extrait réel Apple Music</div>
       </div>
       ${t.itunesTrackUrl ? `<a href="${t.itunesTrackUrl}" target="_blank" rel="noopener" title="Ouvrir dans Apple Music" style="font-size:15px;flex:0 0 auto;">🎵</a>` : ''}
       <button data-action="toggle-play" data-id="${t.id}">⏸</button>
@@ -1965,7 +1978,7 @@ function renderMiniPlayer(){
     <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
     <div class="mp-info">
       <div class="mp-title">${esc(t.title)}</div>
-      <div class="mp-artist">${esc(t.artist)} · <span style="color:${g.color};">${g.name}</span> · extrait démo</div>
+      <div class="mp-artist">${esc(t.artist)}${t.isRealCity?'':` · <span style="color:${g.color};">${g.name}</span>`} · extrait démo</div>
       <div class="mp-progress"><div id="mpProgressFill" style="width:0%;"></div></div>
     </div>
     <button data-action="toggle-play" data-id="${t.id}">⏸</button>
@@ -2082,6 +2095,7 @@ function renderHome(){
       <button class="${state.period==='7d'?'active':''}" data-action="period" data-period="7d">${tr('home.period7d')}</button>
       <button class="${state.period==='30d'?'active':''}" data-action="period" data-period="30d">${tr('home.period30d')}</button>
     </div>`}
+    ${state.scope!=='city' ? `
     <div class="chiprow">
       <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
       <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
@@ -2090,7 +2104,8 @@ function renderHome(){
       <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
       <div class="chip ${quickGenreActive('techno')?'active':''}" data-action="quickgenre" data-g="techno">${tr('home.chipTechno')}</div>
       <div class="chip ghost" data-action="open-genre-sheet">${tr('home.chipMoreGenres')}</div>
-    </div>
+    </div>` : `
+    <div style="font-size:10.5px;color:var(--text-muted);margin-top:9px;line-height:1.4;">Filtre par genre indisponible ici : Soundcharts ne fournit pas le genre réel de chaque morceau pour les classements ville.</div>`}
   </div>
 
   <div class="section-title"><h2>${tr('home.trendingNow')}</h2>
