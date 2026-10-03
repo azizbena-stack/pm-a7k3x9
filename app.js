@@ -195,7 +195,7 @@ async function fetchRealCityChart(appCityId, platform, period){
     if(!latestRows || !latestRows.length){ realChartCache[key] = []; return []; }
     const latestDate = latestRows[0].captured_at;
     const entriesRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${latestDate}&select=rank,previous_rank,tracks(title,artist_name,cover_url,youtube_id)&order=rank.asc&limit=30`,
+      `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${latestDate}&select=rank,previous_rank,tracks(title,artist_name,cover_url,youtube_id)&order=rank.asc&limit=100`,
       { headers: SUPABASE_HEADERS }
     );
     let entries = await entriesRes.json();
@@ -2903,7 +2903,7 @@ document.addEventListener('click', async (e)=>{
     renderAuthScreen();
   }
   else if(a==='nav'){ state.view = el.dataset.view; renderView(); }
-  else if(a==='scope'){ state.scope = el.dataset.scope; renderView(); }
+  else if(a==='scope'){ state.scope = el.dataset.scope; state.genreFilters = new Set(); renderView(); }
   else if(a==='home-city-platform'){ state.homeCityPlatform = el.dataset.p; renderView(); }
   else if(a==='period'){ state.period = el.dataset.period; renderView(); }
   else if(a==='city-period'){ state.cityPeriod = el.dataset.period; renderView(); }
