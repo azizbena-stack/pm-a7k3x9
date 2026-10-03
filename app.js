@@ -2213,6 +2213,18 @@ function quickGenreActive(key){
   if(key==='house') return s.size===1 && s.has('house');
   return false;
 }
+// Which of the 5 quick-chip genres (if any) is the ONLY active filter right
+// now — these are the ones with a real, synced Beatport genre chart (see
+// genre_chart_entries / activeRealGenreKey below). A broader/combined
+// selection made via "+ de genres" still falls back to the static catalogue.
+function activeRealGenreKey(){
+  if(quickGenreActive('afro-house')) return 'afro-house';
+  if(quickGenreActive('afro-tech')) return 'afro-tech';
+  if(quickGenreActive('house')) return 'house';
+  if(quickGenreActive('melodic')) return 'melodic';
+  if(quickGenreActive('techno')) return 'techno';
+  return null;
+}
 
 /* ============================================================================
    RENDER: ROOT DISPATCH
@@ -2220,7 +2232,7 @@ function quickGenreActive(key){
 function renderView(){
   document.querySelectorAll('.nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.view===state.view));
   const c = document.getElementById('view-container');
-  if(state.view==='home') { c.innerHTML = renderHome(); if(state.scope==='city') loadHomeCityList(); }
+  if(state.view==='home') { c.innerHTML = renderHome(); if(state.scope==='city') loadHomeCityList(); else loadHomeGenreChartList(); }
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
   else if(state.view==='radar') c.innerHTML = renderRadar();
@@ -2253,6 +2265,7 @@ function periodTrendOf(t){
 function renderHome(){
   const list = scopedList();
   const freeLimit = 20;
+  const realGenreKey = activeRealGenreKey();
   const trending = TRACKS.filter(trackMatchesGenreFilter).slice().sort((a,b)=>{
     const pa = state.trendingPeriod==='24h'?a.trend24h:state.trendingPeriod==='30d'?a.trend30d:a.trend7d;
     const pb = state.trendingPeriod==='24h'?b.trend24h:state.trendingPeriod==='30d'?b.trend30d:b.trend7d;
@@ -2324,6 +2337,11 @@ function renderHome(){
     <div class="empty-msg">Chargement…</div>
   </div>
   <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
+  ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : realGenreKey ? `
+  <div class="track-list" id="homeGenreChartList">
+    <div class="empty-msg">Chargement…</div>
+  </div>
+  <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
   ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : `
   <div class="track-list">
     ${list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)).join('')}
@@ -2340,6 +2358,43 @@ async function loadHomeCityList(){
   const entries = await fetchRealCityChart(appCityId, platform, period);
   if(state.scope!=='city' || state.selectedCity!==appCityId || state.homeCityPlatform!==platform || state.cityPeriod!==period) return; // user moved on
   const host = document.getElementById('homeCityList');
+  if(host) host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS });
+}
+
+// Real per-genre Top 100 (Monde/Pays), synced daily from Beatport's own
+// genre charts via Soundcharts — see genre_chart_entries table. Replaces the
+// old behaviour of filtering the ~100-track static catalogue by genre, which
+// left genres like Afro Tech with only 3 tracks instead of a real 100.
+// Shaped exactly like fetchRealCityChart's entries ({rank, previous_rank,
+// tracks:{...}}) so the existing realChartListHTML/renderRealTrackRow can
+// render it as-is, no new UI code needed.
+const genreChartCache = {}; // genre_key -> entries[] (session-only)
+async function fetchGenreChart(genreKey){
+  if(genreChartCache[genreKey]) return genreChartCache[genreKey];
+  try{
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/genre_chart_entries?genre_key=eq.${genreKey}&select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=100`,
+      { headers: SUPABASE_HEADERS }
+    );
+    const rows = await res.json();
+    const entries = (rows||[]).map(r=>({
+      rank: r.rank,
+      previous_rank: r.previous_rank,
+      tracks: { title: r.title, artist_name: r.artist_name, cover_url: r.cover_url, youtube_id: null },
+    }));
+    genreChartCache[genreKey] = entries;
+    return entries;
+  } catch(e){
+    genreChartCache[genreKey] = [];
+    return [];
+  }
+}
+async function loadHomeGenreChartList(){
+  const genreKey = activeRealGenreKey();
+  if(!genreKey || state.scope==='city') return;
+  const entries = await fetchGenreChart(genreKey);
+  if(activeRealGenreKey()!==genreKey || state.scope==='city') return; // user moved on
+  const host = document.getElementById('homeGenreChartList');
   if(host) host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS });
 }
 
