@@ -320,6 +320,14 @@ function realChartPlatformTabsHTML(action, selected){
     ${PLATFORMS_UI.map(p=>`<button class="${p===selected?'active':''}" data-action="${action}" data-p="${p}">${PLATFORM_LABEL[p]}</button>`).join('')}
   </div>`;
 }
+// Bouton PRO placé juste là où le flou commence (pas besoin de descendre en bas) : lignes gratuites, bouton, puis quelques lignes floutées.
+function lockBannerHTML(){
+  return `<div class="hpad" style="margin:10px 0;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>`;
+}
+function withLockBanner(rows, freeLimit){
+  if(isPro() || freeLimit==null || rows.length<=freeLimit) return rows.join('');
+  return rows.slice(0,freeLimit).join('') + lockBannerHTML() + rows.slice(freeLimit, freeLimit+5).join('');
+}
 function realChartListHTML(entries, opts){
   opts = opts || {};
   if(!entries.length) return `<div class="empty-msg">Pas encore de classement synchronisé pour cette ville/plateforme.</div>`;
@@ -332,7 +340,7 @@ function realChartListHTML(entries, opts){
     return !isPlaceholderTitle(t.title);
   });
   if(!filtered.length) return `<div class="empty-msg">Classement en cours de synchronisation, revenez dans quelques minutes.</div>`;
-  return filtered.map((e,i)=>renderRealTrackRow(e,i, opts.freeLimit!=null && i>=opts.freeLimit)).join('');
+  return withLockBanner(filtered.map((e,i)=>renderRealTrackRow(e,i, opts.freeLimit!=null && i>=opts.freeLimit)), opts.freeLimit);
 }
 
 /* ---------------------------- REAL CHART DATA -----------------------------
@@ -2475,7 +2483,7 @@ function renderHome(){
     <div class="empty-msg">Chargement…</div>
   </div>
   <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
-  ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : state.scope==='country' ? `
+` : state.scope==='country' ? `
   <div class="track-list" id="homeCountryList">
     <div class="empty-msg">Chargement…</div>
   </div>
@@ -2484,11 +2492,11 @@ function renderHome(){
     <div class="empty-msg">Chargement…</div>
   </div>
   <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
-  ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : `
+` : `
   <div class="track-list">
-    ${list.length===0 ? `<div class="empty-msg">Classement bientôt disponible pour ce genre.</div>` : list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)).join('')}
+    ${list.length===0 ? `<div class="empty-msg">Classement bientôt disponible pour ce genre.</div>` : withLockBanner(list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)), freeLimit)}
   </div>
-  ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}`}
+`}
   <div style="height:8px;"></div>
   `;
 }
@@ -2514,7 +2522,7 @@ async function loadHomeCityList(){
     // Pas encore de données électro pour ce pays : sélection électro de démonstration, classée par affinité avec la ville.
     const demo = TRACKS.filter(trackMatchesGenreFilter).slice().sort((a,b)=>(b.cityAffinity[appCityId]||0)-(a.cityAffinity[appCityId]||0));
     host.innerHTML = `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">Classement électro réel de cette ville bientôt disponible : sélection électro de démonstration.</div>`
-      + demo.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)).join('');
+      + withLockBanner(demo.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)), 20);
     return;
   }
   host.innerHTML = (note ? `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">${note}</div>` : '')
@@ -2576,7 +2584,7 @@ async function loadHomeCountryList(){
   if(entries.length){ host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS }); return; }
   const list = scopedList();
   host.innerHTML = `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">Classement électro de ce pays bientôt disponible : sélection électro de démonstration.</div>`
-    + list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)).join('');
+    + withLockBanner(list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)), 20);
 }
 
 // Real per-genre Top 100 (Monde/Pays), synced daily from Beatport's own
