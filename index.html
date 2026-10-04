@@ -306,6 +306,9 @@ button{font-family:inherit;}
   <!-- GENRE SHEET -->
   <div id="genreOverlay" class="overlay sheet hidden"></div>
 
+  <!-- PLAY CHOICE -->
+  <div id="playChoice" class="overlay sheet hidden"></div>
+
   <!-- PAYWALL -->
   <div id="paywallOverlay" class="overlay sheet hidden"></div>
 </div>
@@ -1864,7 +1867,7 @@ function coverInitials(title){
   return title.replace(/\(.*?\)/g,'').trim().split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 }
 // Pochettes Deezer et Beatport exclues (droits) : on utilise l'artwork Apple (voir pumpCoverQueue) — Deezer : conditions non commerciales ; : on utilise l'artwork Apple à la place (voir pumpCoverQueue).
-function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com|beatport\.com/i.test(u)) ? u : null; }
+function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com|beatport\.com|soundcharts\.com/i.test(u)) ? u : null; }
 function coverHTML(t, big){
   const playing = state.playingId===t.id;
   // Real Beatport cover art is hotlinked from Beatport's own public CDN (the same
@@ -2168,9 +2171,48 @@ async function itunesSearchOnce(term){
   }catch(e){ return {ok:false}; /* network/timeout/CORS error — not a confirmed absence */ }
   finally{ if(timer) clearTimeout(timer); }
 }
+/* Mémoire persistante des correspondances Apple (aperçu + pochette) : chaque morceau n'est cherché qu'une fois,
+   ce qui évite de saturer l'API Apple (limite d'environ 20 requêtes par minute). */
+const IT_STORE_KEY = 'pulse_itunes_v1';
+let itStore = {};
+try{ itStore = JSON.parse(localStorage.getItem(IT_STORE_KEY) || '{}') || {}; }catch(e){ itStore = {}; }
+function itKey(t){ return coreTitle(t.title)+'|'+normText(t.artist); }
+function itStoreGet(t){
+  const h = itStore[itKey(t)];
+  if(!h || !h.p || Date.now()-(h.t||0) > 7*86400000) return null;
+  return { previewUrl:h.p, trackViewUrl:h.v||null, artwork:h.a||null };
+}
+function itStorePut(t, hit){
+  itStore[itKey(t)] = { p:hit.previewUrl, v:hit.trackViewUrl, a:hit.artwork, t:Date.now() };
+  const ks = Object.keys(itStore); if(ks.length>1500) delete itStore[ks[0]];
+  try{ localStorage.setItem(IT_STORE_KEY, JSON.stringify(itStore)); }catch(e){}
+}
+const coverMiss = new Set(); let itBackoffUntil = 0; let coverUsedNet = false;
+// Une seule requête par morceau (pas la recherche en 5 essais réservée au clic sur Play).
+async function lookupCoverCheap(t){
+  coverUsedNet = false;
+  const sh = itStoreGet(t); if(sh) return sh;
+  const k = itKey(t);
+  if(coverMiss.has(k) || Date.now()<itBackoffUntil) return null;
+  coverUsedNet = true;
+  const lead = (t.artist||'').split(/[,&]/)[0].replace(/\s*[\(\[][^\)\]]*[\)\]]\s*/g,'').trim();
+  const tries = [`${t.title} ${t.artist}`, `${coreTitle(t.title)} ${lead}`];
+  let m = null;
+  for(let i=0;i<tries.length && !m;i++){
+    if(i>0) await new Promise(r=>setTimeout(r,1500));
+    const r = await itunesSearchOnce(tries[i]);
+    if(!r.ok){ itBackoffUntil = Date.now()+60000; return null; } // limite atteinte ou réseau : on attend 1 minute
+    m = (r.results||[]).find(res=>res.previewUrl && itunesHitMatches(t.title, t.artist, res.trackName, res.artistName));
+  }
+  if(!m){ coverMiss.add(k); return null; }
+  const hit = { previewUrl:m.previewUrl, trackViewUrl:m.trackViewUrl||null, artwork:m.artworkUrl100 ? m.artworkUrl100.replace('100x100','300x300') : null };
+  itStorePut(t, hit); itunesCache[t.id] = hit;
+  return hit;
+}
 async function lookupItunesPreview(t){
   const key = t.id;
   if(itunesCache[key] !== undefined) return itunesCache[key];
+  const stored = itStoreGet(t); if(stored){ itunesCache[key] = stored; return stored; }
   // Many catalogue titles carry DJ remix/edit suffixes — e.g. "(Dario Nunez &
   // Juany Bravo Extended Remix)" — and a full artist credits list — e.g. "DJ
   // Care, MikroBeats, Aaron Sevilla" — that the exact beatport-style string
@@ -2217,7 +2259,7 @@ async function lookupItunesPreview(t){
     const match = cands.find(res=>normText(res.trackName)===normText(cleanTitle)) || cands.find(res=>normText(res.trackName)===normText(t.title)) || cands[0];
     if(match){ hit = { previewUrl: match.previewUrl, trackViewUrl: match.trackViewUrl || null, artwork: match.artworkUrl100 ? match.artworkUrl100.replace('100x100','300x300') : null }; break; }
   }
-  if(hit){ itunesCache[key] = hit; return hit; }
+  if(hit){ itunesCache[key] = hit; itStorePut(t, hit); return hit; }
   if(anyFailed) return null; // transient failure — leave uncached so the next tap retries
   itunesCache[key] = null; // every attempt completed and genuinely found nothing — a real, cacheable negative
   return null;
@@ -2327,6 +2369,25 @@ function externalSearchUrl(p, t){
     SoundCloud: 'https://soundcloud.com/search?q='+q,
   })[p];
 }
+function openPlayChoice(id){
+  const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
+  if(!t) return;
+  const ov = document.getElementById('playChoice');
+  ov.classList.remove('hidden');
+  const b = (s, label, sub)=>`<button class="btn btn-outline btn-block" style="text-align:left;display:block;" data-action="play-with" data-s="${s}" data-id="${id}">${label}<div style="font-size:10.5px;font-weight:600;color:var(--text-muted);margin-top:2px;">${sub}</div></button>`;
+  ov.innerHTML = `<div class="sheet-inner">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;">
+      <div style="min-width:0;"><div style="font-size:11px;color:var(--text-muted);font-weight:800;">ÉCOUTER AVEC</div>
+        <div style="font-weight:800;font-size:14px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.title)}</div>
+        <div style="font-size:11.5px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.artist||'')}</div></div>
+      <button class="close-btn" data-action="close-play-choice">✕</button></div>
+    <div style="display:flex;flex-direction:column;gap:9px;">
+      ${b('apple','🍎 Apple Music', "Extrait de 30 s directement dans l'app")}
+      ${b('spotify','🟢 Spotify', t.spotifyId ? "Lecteur Spotify dans l'app" : 'Ouvre la recherche Spotify')}
+      ${b('youtube','▶️ YouTube', t.youtubeId ? "Lecteur YouTube dans l'app" : 'Ouvre la recherche YouTube')}
+      ${isPro() ? b('beatport','🟠 Beatport','Ouvrir le morceau sur Beatport') : `<button class="btn btn-outline btn-block" style="text-align:left;display:block;opacity:.8;" data-action="open-paywall">🟠 Beatport 🔒 PRO<div style="font-size:10.5px;font-weight:600;color:var(--text-muted);margin-top:2px;">Réservé à la version PRO</div></button>`}
+    </div></div>`;
+}
 function playSourceHTML(){
   const cur = getPlaySource();
   const opts = [['apple','Apple Music'],['spotify','Spotify'],['youtube','YouTube']];
@@ -2344,7 +2405,7 @@ async function pumpCoverQueue(){
   while(coverQueue.length){
     const el = coverQueue.shift(); const t = realTracksCache[el.dataset.lazycover] || TRACKS.find(x=>x.id===el.dataset.lazycover);
     if(!t || !el.isConnected || safeCover(t.coverUrl)) continue;
-    const hit = await lookupItunesPreview(t);
+    const hit = await lookupCoverCheap(t);
     if(hit && hit.artwork){
       t.coverUrl = hit.artwork;
       const img = new Image(); img.alt=''; img.referrerPolicy='no-referrer';
@@ -2352,7 +2413,7 @@ async function pumpCoverQueue(){
       img.onload = ()=>{ if(el.isConnected) el.insertBefore(img, el.firstChild); };
       img.src = hit.artwork;
     }
-    await new Promise(r=>setTimeout(r,250)); // ménage l'API Apple
+    if(coverUsedNet) await new Promise(r=>setTimeout(r,3200)); // ménage l'API Apple (≈ 19 requêtes/min)
   }
   coverBusy = false;
 }
@@ -2365,11 +2426,11 @@ function scanLazyCovers(){
   if(typeof MutationObserver==='undefined') return;
   if(document.body) start(); else document.addEventListener('DOMContentLoaded', start);
 })();
-async function togglePlay(id){
+async function togglePlay(id, forcedSource){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   state.noPreview = null;
-  const src = getPlaySource();
+  const src = forcedSource || 'apple';
   if(src==='spotify'){
     if(t.spotifyId){ stopPlayback(); state.playingId = id; state.playingEmbed = 'spotify'; updatePlayerUI(); return; }
     window.open(externalSearchUrl('Spotify', t), '_blank', 'noopener'); return;
@@ -3186,8 +3247,6 @@ function renderProfile(){
 
   <div class="section-title"><h2>${tr('profile.language')}</h2></div>
   <div class="hpad">${langSwitcherHTML(state.lang)}</div>
-  <div style="height:12px;"></div>
-  ${playSourceHTML()}
 
   <div class="divider"></div>
   <div class="hpad" style="display:flex;flex-direction:column;gap:9px;">
@@ -3321,7 +3380,6 @@ function renderTrackOverlay(){
         <div class="platform-btn" data-action="platform" data-p="YouTube" data-id="${t.id}">▶️ YouTube</div>
         <div class="platform-btn" data-action="platform" data-p="Beatport" data-id="${t.id}">🟠 ${tr('track.beatport')}</div>
       </div>
-      ${playSourceHTML()}
       <div style="height:20px;"></div>
     </div>
   `;
@@ -3713,12 +3771,21 @@ document.addEventListener('click', async (e)=>{
     }
     else toast(tf('toast.openingOn',{p}));
   }
+  else if(a==='toggle-play'){
+    const pid = el.dataset.id;
+    if(state.playingId===pid) togglePlay(pid); else openPlayChoice(pid);
+  }
+  else if(a==='play-with'){
+    document.getElementById('playChoice').classList.add('hidden');
+    if(el.dataset.s==='beatport'){ const tt = TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]; if(tt) window.open(externalSearchUrl('Beatport', tt), '_blank', 'noopener'); }
+    else togglePlay(el.dataset.id, el.dataset.s);
+  }
+  else if(a==='close-play-choice'){ document.getElementById('playChoice').classList.add('hidden'); }
   else if(a==='set-play-source'){
     if(!isPro()){ openPaywall(); return; }
     try{ localStorage.setItem(PLAY_SOURCE_KEY, el.dataset.s); }catch(e){}
     if(!document.getElementById('trackOverlay').classList.contains('hidden')) renderTrackOverlay(); else renderView();
   }
-  else if(a==='toggle-play'){ togglePlay(el.dataset.id); }
   else if(a==='close-nopreview'){ state.noPreview = null; updatePlayerUI(); }
   else if(a==='featured-add'){ featuredAdd(); }
   else if(a==='featured-del'){ featuredDel(el.dataset.id); }
