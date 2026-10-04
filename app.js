@@ -1508,8 +1508,8 @@ function coverStyle(genreId, seed){
 function coverInitials(title){
   return title.replace(/\(.*?\)/g,'').trim().split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 }
-// Pochettes Deezer exclues (conditions non commerciales) : on utilise l'artwork Apple à la place (voir pumpCoverQueue).
-function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com/i.test(u)) ? u : null; }
+// Pochettes Deezer et Beatport exclues (droits) : on utilise l'artwork Apple (voir pumpCoverQueue) — Deezer : conditions non commerciales ; : on utilise l'artwork Apple à la place (voir pumpCoverQueue).
+function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com|beatport\.com/i.test(u)) ? u : null; }
 function coverHTML(t, big){
   const playing = state.playingId===t.id;
   // Real Beatport cover art is hotlinked from Beatport's own public CDN (the same
@@ -1522,7 +1522,7 @@ function coverHTML(t, big){
   const verified = !!(t.spotifyId || t.youtubeId);
   const spotifyBadge = (verified || t.itunesPreviewUrl) ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="${verified?'Morceau vérifié (Spotify/YouTube)':'Extrait audio réel disponible (Apple Music)'}">✓</div>` : '';
   return `<div class="cover-wrap">
-    <div class="cover${big?' lg':''}" ${(!safeCover(t.coverUrl) && t.isRealCity)?`data-lazycover="${t.id}"`:''} style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
+    <div class="cover${big?' lg':''}" ${!safeCover(t.coverUrl)?`data-lazycover="${t.id}"`:''} style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
     <button class="play-overlay${big?' lg':''}${playing?' playing':''}" data-action="toggle-play" data-id="${t.id}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
   </div>`;
 }
@@ -1961,7 +1961,7 @@ const coverObserver = typeof IntersectionObserver!=='undefined' ? new Intersecti
 async function pumpCoverQueue(){
   if(coverBusy) return; coverBusy = true;
   while(coverQueue.length){
-    const el = coverQueue.shift(); const t = realTracksCache[el.dataset.lazycover];
+    const el = coverQueue.shift(); const t = realTracksCache[el.dataset.lazycover] || TRACKS.find(x=>x.id===el.dataset.lazycover);
     if(!t || !el.isConnected || safeCover(t.coverUrl)) continue;
     const hit = await lookupItunesPreview(t);
     if(hit && hit.artwork){
@@ -2144,7 +2144,7 @@ function renderMiniPlayer(){
     const g2 = genreById(t.genre);
     return `
     <div class="mini-player mini-player-spotify">
-      <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
+      <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${safeCover(t.coverUrl)?`<img src="${safeCover(t.coverUrl)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
       <div class="mp-info">
         <div class="mp-title">${esc(t.title)}</div>
         <div class="mp-artist">${esc(t.artist)}${t.isRealCity?'':` · <span style="color:${g2.color};">${g2.name}</span>`} · extrait réel Apple Music</div>
@@ -2157,7 +2157,7 @@ function renderMiniPlayer(){
   const g = genreById(t.genre);
   return `
   <div class="mini-player">
-    <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
+    <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${safeCover(t.coverUrl)?`<img src="${safeCover(t.coverUrl)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
     <div class="mp-info">
       <div class="mp-title">${esc(t.title)}</div>
       <div class="mp-artist">${esc(t.artist)}${t.isRealCity?'':` · <span style="color:${g.color};">${g.name}</span>`} · extrait démo</div>
