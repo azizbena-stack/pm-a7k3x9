@@ -1865,6 +1865,91 @@ async function lookupItunesPreview(t){
   itunesCache[key] = null; // every attempt completed and genuinely found nothing — a real, cacheable negative
   return null;
 }
+/* ---------------------------- EN VOGUE (réservé au propriétaire) ----------------------------
+   Morceaux / artistes mis en avant à la main. Lecture publique ; ajout et suppression
+   seulement par le compte propriétaire (règle Supabase "featured_picks", voir featured_picks.sql). */
+const OWNER_EMAIL = 'azizbena@gmail.com';
+let featuredPicks = []; let featuredLoaded = false;
+function isOwner(){ return !!(authSession && authSession.email && authSession.email.toLowerCase()===OWNER_EMAIL); }
+function refreshFeaturedBox(){ const b = document.getElementById('featuredBox'); if(b) b.innerHTML = featuredHTML(); }
+async function loadFeaturedPicks(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/featured_picks?select=id,kind,title,artist,cover_url&order=position.asc,id.desc&limit=30`, { headers: SUPABASE_HEADERS });
+    if(!res.ok) return;
+    const rows = await res.json();
+    if(Array.isArray(rows)){ featuredPicks = rows; refreshFeaturedBox(); }
+  }catch(e){ /* table absente ou réseau : la section reste masquée */ }
+}
+function featuredHTML(){
+  const owner = isOwner();
+  if(!featuredPicks.length && !owner) return '';
+  const cards = featuredPicks.map(p=>{
+    const del = owner ? `<button data-action="featured-del" data-id="${p.id}" aria-label="Retirer" style="position:absolute;top:6px;right:6px;z-index:3;width:22px;height:22px;border-radius:50%;border:none;background:#000a;color:#fff;font-size:12px;cursor:pointer;">✕</button>` : '';
+    if(p.kind==='artist'){
+      return `<div class="next-card" style="flex:0 0 140px;position:relative;text-align:center;">${del}
+        <div class="cover" style="${coverStyle('afro-house', strSeed(p.title)%9999)}width:72px;height:72px;border-radius:50%;margin:4px auto 0;display:flex;align-items:center;justify-content:center;font-weight:800;">${coverInitials(p.title)}</div>
+        <div style="font-weight:700;font-size:12.5px;margin-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(p.title)}</div>
+        <div style="font-size:10.5px;color:var(--text-muted);">Artiste</div></div>`;
+    }
+    const id = 'pick-'+p.id;
+    realTracksCache[id] = { id, isRealCity:true, title:p.title, artist:p.artist||'', coverUrl:p.cover_url||null,
+      coverSeed:strSeed(p.title+'|'+p.artist)%9999, genre:cityTrackGenre(p.title,p.artist),
+      demoProfile:DEMO_PROFILES[0], demoBpm:DEMO_PROFILES[0].bpm, youtubeId:null };
+    return `<div class="next-card" style="flex:0 0 168px;position:relative;">${del}
+      ${coverHTML(realTracksCache[id],false)}
+      <div style="font-weight:700;font-size:12.5px;margin-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(p.title)}</div>
+      <div style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(p.artist||'')}</div></div>`;
+  }).join('');
+  const form = owner ? `
+    <div class="hpad" style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
+      <div style="font-size:10.5px;color:var(--text-muted);font-weight:800;">🔒 VISIBLE SEULEMENT PAR TOI — AJOUTER</div>
+      <div style="display:flex;gap:8px;">
+        <select id="fp_kind" style="flex:0 0 108px;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px;border-radius:12px;font-size:12px;font-weight:700;"><option value="track">Morceau</option><option value="artist">Artiste</option></select>
+        <input id="fp_title" type="text" placeholder="Titre du morceau ou nom de l'artiste" style="flex:1;min-width:0;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:12.5px;">
+      </div>
+      <input id="fp_artist" type="text" placeholder="Artiste du morceau (laisser vide pour un artiste)" style="background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:12.5px;">
+      <button class="btn btn-primary btn-block" data-action="featured-add">Ajouter à « En vogue »</button>
+    </div>` : '';
+  return `<div class="section-title"><h2>⭐ En vogue</h2></div>
+    ${cards ? `<div class="hscroll">${cards}</div>` : (owner ? '<div class="hpad"><div class="empty-msg">Rien pour l\'instant. Ajoute un morceau ou un artiste ci-dessous.</div></div>' : '')}
+    ${form}`;
+}
+async function featuredAdd(){
+  const kind = (document.getElementById('fp_kind')||{}).value || 'track';
+  const title = ((document.getElementById('fp_title')||{}).value||'').trim();
+  const artist = ((document.getElementById('fp_artist')||{}).value||'').trim();
+  if(!title){ toast('Écris un titre ou un nom.'); return; }
+  const s = await ensureFreshSession();
+  if(!s || !isOwner()){ toast('Connecte-toi avec le compte propriétaire.'); return; }
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/featured_picks`, { method:'POST', headers:{ ...authHeaders(s), Prefer:'return=minimal' }, body: JSON.stringify({ kind, title, artist: kind==='track'?artist:'', position:0 }) });
+    if(!res.ok) throw new Error(res.status);
+    toast('Ajouté ✅'); await loadFeaturedPicks();
+  }catch(e){ toast('Ajout refusé. La table « featured_picks » existe-t-elle sur Supabase ?'); }
+}
+async function featuredDel(id){
+  const s = await ensureFreshSession();
+  if(!s || !isOwner()) return;
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/featured_picks?id=eq.${encodeURIComponent(id)}`, { method:'DELETE', headers: authHeaders(s) });
+    if(!res.ok) throw new Error(res.status);
+    await loadFeaturedPicks();
+  }catch(e){ toast('Suppression refusée.'); }
+}
+/* Pas d'extrait Apple pour ce morceau : liens pour l'écouter ailleurs, au lieu d'un faux son. */
+function noPreviewHTML(){
+  const n = state.noPreview; const q = encodeURIComponent((n.title+' '+n.artist).trim());
+  const b = 'padding:7px 12px;border-radius:12px;background:var(--card-2);border:1px solid var(--border);color:#fff;font-weight:800;font-size:11px;text-decoration:none;';
+  return `<div class="mini-player" style="flex-direction:column;align-items:stretch;gap:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;font-weight:700;">
+      <span>Pas d'extrait ici pour « ${esc(n.title)} ». Écoute-le sur :</span>
+      <button data-action="close-nopreview" aria-label="Fermer" style="background:none;border:none;color:#fff;font-size:15px;cursor:pointer;">✕</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a style="${b}" href="https://open.spotify.com/search/${q}" target="_blank" rel="noopener">Spotify</a>
+      <a style="${b}" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">YouTube</a>
+      <a style="${b}" href="https://music.apple.com/search?term=${q}" target="_blank" rel="noopener">Apple Music</a>
+    </div></div>`;
+}
 /* Pochettes manquantes (la synchro n'en a qu'une partie) : complétées via l'artwork Apple dès que la ligne devient visible. */
 const coverQueue = []; let coverBusy = false;
 const coverObserver = typeof IntersectionObserver!=='undefined' ? new IntersectionObserver(es=>{
@@ -1900,6 +1985,7 @@ function scanLazyCovers(){
 async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
+  state.noPreview = null;
   if(state.playingId===id){ stopPlayback(); return; }
   // Priority order (revised: a confirmed mobile test showed the hidden
   // Spotify controller can report "playing" while staying silent — a
@@ -1985,7 +2071,7 @@ async function togglePlay(id){
   // labelled "extrait démo" in the mini player (never claims to be the
   // real recording).
   // Morceau d'un vrai classement sans extrait Apple : pas de boucle synthétique (ce n'est pas le bon son).
-  if(t.isRealCity){ stopPlayback(); updatePlayerUI(); toast('Extrait indisponible pour ce morceau.'); return; }
+  if(t.isRealCity){ stopPlayback(); state.noPreview = {title:t.title, artist:t.artist}; updatePlayerUI(); return; }
   state.playingId = null;
   playTrack(t);
 }
@@ -2009,7 +2095,7 @@ function updatePlayerUI(){
   });
 }
 function renderMiniPlayer(){
-  if(!state.playingId) return '';
+  if(!state.playingId) return state.noPreview ? noPreviewHTML() : '';
   const t = TRACKS.find(x=>x.id===state.playingId) || realTracksCache[state.playingId];
   if(!t) return '';
   if(state.playingEmbed==='spotify' && t.spotifyId){
@@ -2129,6 +2215,7 @@ function activeRealGenreKey(){
 function countryRealCities(){ return REAL_CITIES.filter(c=>c.country===state.selectedCountry); }
 function cityViewId(){ return state.scope==='country' && state.countryCity && countryRealCities().some(c=>c.id===state.countryCity) ? state.countryCity : null; }
 function renderView(){
+  if(state.view==='home' && !featuredLoaded){ featuredLoaded = true; loadFeaturedPicks(); }
   document.querySelectorAll('.nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.view===state.view));
   const c = document.getElementById('view-container');
   if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else loadHomeGenreChartList(); }
@@ -2216,6 +2303,8 @@ function renderHome(){
       <div class="chip ghost" data-action="open-genre-sheet">${tr('home.chipMoreGenres')}</div>
     </div>`}
   </div>
+
+  <div id="featuredBox">${featuredHTML()}</div>
 
   <div class="section-title"><h2>${tr('home.trendingNow')}</h2>
     <span class="link" data-action="set-trending-period" data-p="${state.trendingPeriod==='24h'?'7d':state.trendingPeriod==='7d'?'30d':'24h'}">${state.trendingPeriod.toUpperCase()} ⟳</span>
@@ -3149,6 +3238,9 @@ document.addEventListener('click', async (e)=>{
     else toast(tf('toast.openingOn',{p}));
   }
   else if(a==='toggle-play'){ togglePlay(el.dataset.id); }
+  else if(a==='close-nopreview'){ state.noPreview = null; updatePlayerUI(); }
+  else if(a==='featured-add'){ featuredAdd(); }
+  else if(a==='featured-del'){ featuredDel(el.dataset.id); }
   else if(a==='mini-player-stop'){ stopPlayback(); }
   else if(a==='explore-mode'){ state.exploreMode = el.dataset.m; document.getElementById('view-container').innerHTML = renderExplore(); }
   else if(a==='explore-open'){
