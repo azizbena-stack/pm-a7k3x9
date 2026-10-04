@@ -1866,8 +1866,8 @@ function coverStyle(genreId, seed){
 function coverInitials(title){
   return title.replace(/\(.*?\)/g,'').trim().split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 }
-// Pochettes Deezer et Beatport exclues (droits) : on utilise l'artwork Apple (voir pumpCoverQueue) — Deezer : conditions non commerciales ; : on utilise l'artwork Apple à la place (voir pumpCoverQueue).
-function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com|beatport\.com|soundcharts\.com/i.test(u)) ? u : null; }
+// Pochettes Deezer (conditions non commerciales) et Soundcharts (accès refusé, 403) exclues ; les pochettes Beatport du catalogue fixe sont rétablies ; le reste vient d'Apple (voir pumpCoverQueue) ; : on utilise l'artwork Apple à la place (voir pumpCoverQueue).
+function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com|soundcharts\.com/i.test(u)) ? u : null; }
 function coverHTML(t, big){
   const playing = state.playingId===t.id;
   // Real Beatport cover art is hotlinked from Beatport's own public CDN (the same
