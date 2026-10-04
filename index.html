@@ -339,7 +339,6 @@ const TODAY = new Date('2026-08-15');
 /* ---------------------------- REFERENCE DATA ---------------------------- */
 const GENRES = [
   {id:'afro-house',    name:'Afro House',        color:'#3987e5'},
-  {id:'afro-tech',      name:'Afro Tech',          color:'#d95926'},
   {id:'deep-house',     name:'Deep House',         color:'#c98500'},
   {id:'organic-house',  name:'Organic House',      color:'#d55181'},
   {id:'melodic-house',  name:'Melodic House',      color:'#008300'},
@@ -347,9 +346,14 @@ const GENRES = [
   {id:'progressive-house', name:'Progressive House', color:'#3987e5'},
   {id:'minimal-deeptech', name:'Minimal / Deep Tech', color:'#199e70'},
   {id:'tribal-house',   name:'Tribal House',       color:'#d55181'},
-  // "House", "Techno", "Tech House" et "Indie Dance" retirés du catalogue le
-  // 2026-10-04 sur demande explicite — plus de morceaux, plus de filtre, plus
-  // de chip pour ces 4 genres.
+  // 2026-10-04 : Afro Tech retiré ; Indie Dance, Hard Techno, Funky House, Indie Tech
+  // et Disco House ajoutés sur demande (pas encore de morceaux dans le catalogue
+  // ni de classement réel synchronisé : la liste affiche un message d'attente).
+  {id:'indie-dance', name:'Indie Dance', color:'#e5a000'},
+  {id:'hard-techno', name:'Hard Techno', color:'#e04343'},
+  {id:'funky-house', name:'Funky House', color:'#e0b100'},
+  {id:'indie-tech', name:'Indie Tech', color:'#6aa84f'},
+  {id:'disco-house', name:'Disco House', color:'#d65db1'},
 ];
 const genreById = id => GENRES.find(g=>g.id===id);
 
@@ -560,7 +564,7 @@ function realTrackMoveHTML(rank, prev){
 // jamais présenter une donnée fabriquée comme si elle venait de Soundcharts.
 // cityTrackGenre() reste UNIQUEMENT pour varier la couleur/texture de la pochette
 // (coverStyle) — jamais affiché en texte, jamais utilisé pour filtrer la liste Ville.
-const CITY_PSEUDO_GENRES = ['afro-house','afro-tech','melodic-house','melodic-techno'];
+const CITY_PSEUDO_GENRES = ['afro-house','melodic-house','melodic-techno'];
 function cityTrackGenre(title, artist){
   const seedKey = (title||'')+'|'+(artist||'');
   return CITY_PSEUDO_GENRES[strSeed(seedKey) % CITY_PSEUDO_GENRES.length];
@@ -660,9 +664,9 @@ const REAL_TRACKS = [
   {title:'Sueño Contigo', artist:'Nolek, Aaron Sevilla', genre:'afro-house', label:'Sunset Gathering', chartRank:11, cover:BP_IMG('13e5543d-1dd5-4abe-87c9-b8e534f68668')},
   {title:'Say What (feat. Chuala)', artist:'&ME, Rampa, Adam Port, Keinemusik, chuala', genre:'afro-house', label:'Keinemusik', chartRank:12, cover:BP_IMG('95ae01c4-128f-44f6-8c4d-df4f0032faa3'), spotifyId:'73YTJNeXISV9QHMG82ZrwP'},
   // Afro Tech — curated from the Afro House chart's more percussive/club-tool entries
-  {title:'YELE (Extended Mix)', artist:'Themba, Vanco', genre:'afro-tech', label:'AfroRepublik', chartRank:18, cover:BP_IMG('0cd5388b-20dc-4826-8ee9-834324410f72')},
-  {title:'Fire Fire', artist:'Shimza, Kasango, AR/CO', genre:'afro-tech', label:'Helix Records', chartRank:20, cover:BP_IMG('975235ae-fb25-4626-a58f-cbfadba6d10b'), spotifyId:'35dt2bP4CcBzepyufQbvYZ'},
-  {title:'Sinnerman', artist:'DJ Care, MikroBeats, Aaron Sevilla', genre:'afro-tech', label:'AFRODISE', chartRank:19, cover:BP_IMG('88ddba3c-6756-4edf-b072-2d7efafa14ef'), spotifyId:'4yn925QAS3ZCtWwtkW1H59'},
+  {title:'YELE (Extended Mix)', artist:'Themba, Vanco', genre:'afro-house', label:'AfroRepublik', chartRank:18, cover:BP_IMG('0cd5388b-20dc-4826-8ee9-834324410f72')},
+  {title:'Fire Fire', artist:'Shimza, Kasango, AR/CO', genre:'afro-house', label:'Helix Records', chartRank:20, cover:BP_IMG('975235ae-fb25-4626-a58f-cbfadba6d10b'), spotifyId:'35dt2bP4CcBzepyufQbvYZ'},
+  {title:'Sinnerman', artist:'DJ Care, MikroBeats, Aaron Sevilla', genre:'afro-house', label:'AFRODISE', chartRank:19, cover:BP_IMG('88ddba3c-6756-4edf-b072-2d7efafa14ef'), spotifyId:'4yn925QAS3ZCtWwtkW1H59'},
   // Tribal House — curated from the Afro House chart's world/percussion-fusion entries
   {title:'Yamore (Extended)', artist:'Salif Keita, Cesaria Evora, MoBlack, Franc Fala, Benja (NL)', genre:'tribal-house', label:'Decca Records France', chartRank:10, cover:BP_IMG('b1089579-c8a6-4ee4-8bb4-f3d333197d1b'), spotifyId:'04l6CQdt3SqYNwREH0K741'},
   {title:"La Verdolaga (feat. Totó La Momposina) (Extended Mix)", artist:'Toto La Momposina, HUGEL', genre:'tribal-house', label:'Defected', chartRank:15, cover:BP_IMG('cb616350-7761-4506-937d-0a8065b656d3'), spotifyId:'1SHDkI7ZAD0qGfEO38D87o'},
@@ -893,7 +897,7 @@ function trendBadge(pct){
 /* ---------------------------- DJ PROFILES (for "similar taste") --------- */
 const FAKE_DJS = [
   {name:'Kwesi Sol', city:'ibiza', genres:['afro-house','organic-house']},
-  {name:'Nala Rivers', city:'capetown', genres:['afro-tech','tribal-house']},
+  {name:'Nala Rivers', city:'capetown', genres:['afro-house','tribal-house']},
   {name:'Théo Marchand', city:'paris', genres:['melodic-techno','techno']},
   {name:'Sanaa Bloom', city:'dubai', genres:['afro-house','melodic-house']},
   {name:'Milo Andrade', city:'miami', genres:['tech-house','house']},
@@ -915,6 +919,7 @@ const state = {
   exploreOpenCityId: null,
   exploreCityPlatform: 'spotify', // apple_music | spotify | shazam — live city charts
   homeCityPlatform: 'spotify',
+  countryCity: '',
   radarTab: 'saved',
   favTracks: new Set(),
   favArtists: new Set(),
@@ -1819,7 +1824,7 @@ function coverHTML(t, big){
   const verified = !!(t.spotifyId || t.youtubeId);
   const spotifyBadge = (verified || t.itunesPreviewUrl) ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="${verified?'Morceau vérifié (Spotify/YouTube)':'Extrait audio réel disponible (Apple Music)'}">✓</div>` : '';
   return `<div class="cover-wrap">
-    <div class="cover${big?' lg':''}" style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
+    <div class="cover${big?' lg':''}" ${(!t.coverUrl && t.isRealCity)?`data-lazycover="${t.id}"`:''} style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
     <button class="play-overlay${big?' lg':''}${playing?' playing':''}" data-action="toggle-play" data-id="${t.id}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
   </div>`;
 }
@@ -1828,7 +1833,7 @@ function coverHTML(t, big){
    No licensed audio is available in this prototype, so each track gets a short
    procedurally generated preview loop (seeded by the track) instead of silence
    or a fake "real" file — it lets the play/pause flow be demoed honestly. */
-const GENRE_BPM = {'afro-house':122,'afro-tech':123,'house':124,'deep-house':121,'organic-house':120,'melodic-house':123,'melodic-techno':124,'tech-house':125,'progressive-house':122,'techno':130,'minimal-deeptech':127,'indie-dance':118,'tribal-house':120};
+const GENRE_BPM = {'afro-house':122,'afro-tech':123,'house':124,'deep-house':121,'organic-house':120,'melodic-house':123,'melodic-techno':124,'tech-house':125,'progressive-house':122,'techno':130,'minimal-deeptech':127,'indie-dance':118,'hard-techno':142,'funky-house':124,'indie-tech':124,'disco-house':122,'tribal-house':120};
 // Each genre gets its own instrumentation character (waveforms, filter, groove,
 // percussion density, melodic vs. atmospheric) so the preview actually feels
 // adapted to the track's genre instead of one generic loop for everything.
@@ -2033,7 +2038,8 @@ function ensureItunesAudioEl(){
   itunesAudioEl = document.createElement('audio');
   itunesAudioEl.id = 'itunesAudioEl';
   itunesAudioEl.style.display = 'none';
-  itunesAudioEl.addEventListener('ended', stopPlayback);
+  // Le clip silencieux d'amorçage se termine tout de suite : ne pas l'arrêter à ce moment-là.
+  itunesAudioEl.addEventListener('ended', ()=>{ if(itunesAudioEl.src===SILENT_AUDIO_DATA_URI) return; stopPlayback(); });
   document.body.appendChild(itunesAudioEl);
   return itunesAudioEl;
 }
@@ -2153,14 +2159,48 @@ async function lookupItunesPreview(t){
     let r = await itunesSearchOnce(attempts[i]);
     if(!r.ok && i===0) r = await itunesSearchOnce(attempts[i]); // one retry, exact query only
     if(!r.ok){ anyFailed = true; continue; }
-    const match = (r.results||[]).find(res => res.previewUrl && itunesHitMatches(t.title, t.artist, res.trackName, res.artistName));
-    if(match){ hit = { previewUrl: match.previewUrl, trackViewUrl: match.trackViewUrl || null }; break; }
+    const cands = (r.results||[]).filter(res => res.previewUrl && itunesHitMatches(t.title, t.artist, res.trackName, res.artistName));
+    // Préfère le titre le plus proche (évite un remix quand l'original existe) ; garde aussi la pochette Apple.
+    const match = cands.find(res=>normText(res.trackName)===normText(cleanTitle)) || cands.find(res=>normText(res.trackName)===normText(t.title)) || cands[0];
+    if(match){ hit = { previewUrl: match.previewUrl, trackViewUrl: match.trackViewUrl || null, artwork: match.artworkUrl100 ? match.artworkUrl100.replace('100x100','300x300') : null }; break; }
   }
   if(hit){ itunesCache[key] = hit; return hit; }
   if(anyFailed) return null; // transient failure — leave uncached so the next tap retries
   itunesCache[key] = null; // every attempt completed and genuinely found nothing — a real, cacheable negative
   return null;
 }
+/* Pochettes manquantes (la synchro n'en a qu'une partie) : complétées via l'artwork Apple dès que la ligne devient visible. */
+const coverQueue = []; let coverBusy = false;
+const coverObserver = typeof IntersectionObserver!=='undefined' ? new IntersectionObserver(es=>{
+  es.forEach(e=>{ if(e.isIntersecting){ coverObserver.unobserve(e.target); coverQueue.push(e.target); } });
+  pumpCoverQueue();
+},{rootMargin:'200px'}) : null;
+async function pumpCoverQueue(){
+  if(coverBusy) return; coverBusy = true;
+  while(coverQueue.length){
+    const el = coverQueue.shift(); const t = realTracksCache[el.dataset.lazycover];
+    if(!t || !el.isConnected || t.coverUrl) continue;
+    const hit = await lookupItunesPreview(t);
+    if(hit && hit.artwork){
+      t.coverUrl = hit.artwork;
+      const img = new Image(); img.alt=''; img.referrerPolicy='no-referrer';
+      img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;';
+      img.onload = ()=>{ if(el.isConnected) el.insertBefore(img, el.firstChild); };
+      img.src = hit.artwork;
+    }
+    await new Promise(r=>setTimeout(r,250)); // ménage l'API Apple
+  }
+  coverBusy = false;
+}
+function scanLazyCovers(){
+  if(!coverObserver) return;
+  document.querySelectorAll('[data-lazycover]:not([data-cv])').forEach(el=>{ el.dataset.cv='1'; coverObserver.observe(el); });
+}
+(function(){
+  const start = ()=>{ let tm; new MutationObserver(()=>{ clearTimeout(tm); tm = setTimeout(scanLazyCovers,80); }).observe(document.body,{childList:true,subtree:true}); scanLazyCovers(); };
+  if(typeof MutationObserver==='undefined') return;
+  if(document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();
 async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
@@ -2248,6 +2288,8 @@ async function togglePlay(id){
   // ID to fall back on — go straight to the generated preview, clearly
   // labelled "extrait démo" in the mini player (never claims to be the
   // real recording).
+  // Morceau d'un vrai classement sans extrait Apple : pas de boucle synthétique (ce n'est pas le bon son).
+  if(t.isRealCity){ stopPlayback(); updatePlayerUI(); toast('Extrait indisponible pour ce morceau.'); return; }
   state.playingId = null;
   playTrack(t);
 }
@@ -2361,7 +2403,7 @@ function setQuickGenre(key){
   if(key==='all'){ /* empty = all */ }
   else if(key==='melodic'){ state.genreFilters.add('melodic-house'); state.genreFilters.add('melodic-techno'); }
   else if(key==='afro-house'){ state.genreFilters.add('afro-house'); }
-  else if(key==='afro-tech'){ state.genreFilters.add('afro-tech'); }
+  else if(genreById(key)){ state.genreFilters.add(key); }
   renderView();
 }
 function quickGenreActive(key){
@@ -2369,8 +2411,7 @@ function quickGenreActive(key){
   if(key==='all') return s.size===0;
   if(key==='melodic') return s.size===2 && s.has('melodic-house') && s.has('melodic-techno');
   if(key==='afro-house') return s.size===1 && s.has('afro-house');
-  if(key==='afro-tech') return s.size===1 && s.has('afro-tech');
-  return false;
+  return s.size===1 && s.has(key);
 }
 // Which of the quick-chip genres (if any) is the ONLY active filter right
 // now — these are the ones with a real, synced Beatport genre chart (see
@@ -2379,20 +2420,22 @@ function quickGenreActive(key){
 // "House" et "Techno" retirés de ce groupe le 2026-10-04 avec le reste du
 // catalogue de ces 2 genres (demande explicite) — plus de chip, plus de
 // chart réel accessible depuis l'app pour ces 2-là.
+// Genres qui ont un vrai Top 100 synchronisé (indie-tech n'a pas de classement chez Beatport : reste sur le message d'attente).
+const REAL_GENRE_KEYS = ['afro-house','melodic','indie-dance','hard-techno','deep-house','funky-house','minimal-deeptech','progressive-house','disco-house'];
 function activeRealGenreKey(){
-  if(quickGenreActive('afro-house')) return 'afro-house';
-  if(quickGenreActive('afro-tech')) return 'afro-tech';
-  if(quickGenreActive('melodic')) return 'melodic';
-  return null;
+  return REAL_GENRE_KEYS.find(k=>quickGenreActive(k)) || null;
 }
 
 /* ============================================================================
    RENDER: ROOT DISPATCH
    ============================================================================ */
+// Pays : une ville de ce pays (avec vrai classement Soundcharts) peut être choisie ; '' = tout le pays.
+function countryRealCities(){ return REAL_CITIES.filter(c=>c.country===state.selectedCountry); }
+function cityViewId(){ return state.scope==='country' && state.countryCity && countryRealCities().some(c=>c.id===state.countryCity) ? state.countryCity : null; }
 function renderView(){
   document.querySelectorAll('.nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.view===state.view));
   const c = document.getElementById('view-container');
-  if(state.view==='home') { c.innerHTML = renderHome(); if(state.scope==='city') loadHomeCityList(); else loadHomeGenreChartList(); }
+  if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else loadHomeGenreChartList(); }
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
   else if(state.view==='radar') c.innerHTML = renderRadar();
@@ -2447,30 +2490,35 @@ function renderHome(){
     ${state.scope==='country' ? `
       <select class="chip-select" data-action="select-country" style="margin-top:9px;width:100%;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:12.5px;font-weight:700;">
         ${COUNTRIES.map(c=>`<option value="${c.code}" ${c.code===state.selectedCountry?'selected':''}>${c.flag} ${cname(c.code)}</option>`).join('')}
-      </select>` : ''}
-    ${state.scope==='city' ? `
-      <select class="chip-select" data-action="select-city" style="margin-top:9px;width:100%;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:12.5px;font-weight:700;">
-        ${REAL_CITIES.map(c=>`<option value="${c.id}" ${c.id===state.selectedCity?'selected':''}>${countryByCode(c.country).flag} ${c.name}</option>`).join('')}
       </select>
-    <div class="segmented" style="margin-top:9px;">
-      <button class="${state.cityPeriod==='today'?'active':''}" data-action="city-period" data-period="today">${tr('home.periodToday')}</button>
-      <button class="${state.cityPeriod==='7d'?'active':''}" data-action="city-period" data-period="7d">${tr('home.period7d')}</button>
-      <button class="${state.cityPeriod==='30d'?'active':''}" data-action="city-period" data-period="30d">${tr('home.period30d')}</button>
-    </div>` : `
+      ${countryRealCities().length ? `
+      <select class="chip-select" data-action="select-country-city" style="margin-top:9px;width:100%;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:12.5px;font-weight:700;">
+        <option value="" ${!state.countryCity?'selected':''}>🌍 ${cname(state.selectedCountry)} (${tr('home.chipAll')})</option>
+        ${countryRealCities().map(c=>`<option value="${c.id}" ${c.id===state.countryCity?'selected':''}>📍 ${c.name}</option>`).join('')}
+      </select>` : ''}` : ''}
     <div class="segmented" style="margin-top:9px;">
       <button class="${state.period==='today'?'active':''}" data-action="period" data-period="today">${tr('home.periodToday')}</button>
       <button class="${state.period==='7d'?'active':''}" data-action="period" data-period="7d">${tr('home.period7d')}</button>
       <button class="${state.period==='30d'?'active':''}" data-action="period" data-period="30d">${tr('home.period30d')}</button>
-    </div>`}
-    ${state.scope!=='city' ? `
+    </div>
+    ${state.scope==='country' ? `
+    <div class="chiprow">
+      <div class="chip active" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
+    </div>` : `
     <div class="chiprow">
       <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
       <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
-      <div class="chip ${quickGenreActive('afro-tech')?'active':''}" data-action="quickgenre" data-g="afro-tech">${tr('home.chipAfroTech')}</div>
       <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
+      <div class="chip ${quickGenreActive('indie-dance')?'active':''}" data-action="quickgenre" data-g="indie-dance">INDIE DANCE</div>
+      <div class="chip ${quickGenreActive('hard-techno')?'active':''}" data-action="quickgenre" data-g="hard-techno">HARD TECHNO</div>
+      <div class="chip ${quickGenreActive('deep-house')?'active':''}" data-action="quickgenre" data-g="deep-house">DEEP HOUSE</div>
+      <div class="chip ${quickGenreActive('funky-house')?'active':''}" data-action="quickgenre" data-g="funky-house">FUNKY HOUSE</div>
+      <div class="chip ${quickGenreActive('indie-tech')?'active':''}" data-action="quickgenre" data-g="indie-tech">INDIE TECH</div>
+      <div class="chip ${quickGenreActive('minimal-deeptech')?'active':''}" data-action="quickgenre" data-g="minimal-deeptech">MINIMAL</div>
+      <div class="chip ${quickGenreActive('progressive-house')?'active':''}" data-action="quickgenre" data-g="progressive-house">PROGRESSIVE</div>
+      <div class="chip ${quickGenreActive('disco-house')?'active':''}" data-action="quickgenre" data-g="disco-house">DISCO HOUSE</div>
       <div class="chip ghost" data-action="open-genre-sheet">${tr('home.chipMoreGenres')}</div>
-    </div>` : `
-    <div style="font-size:10.5px;color:var(--text-muted);margin-top:9px;line-height:1.4;">Filtre par genre indisponible ici : Soundcharts ne fournit pas le genre réel de chaque morceau pour les classements ville.</div>`}
+    </div>`}
   </div>
 
   <div class="section-title"><h2>${tr('home.trendingNow')}</h2>
@@ -2487,10 +2535,10 @@ function renderHome(){
       </div>`).join('')}
   </div>
 
-  <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' '+cname(state.selectedCountry).toUpperCase():tr('home.topPrefix')+' '+cityById(state.selectedCity).name.toUpperCase()}</h2>
+  <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' '+(state.countryCity?cityById(state.countryCity).name:cname(state.selectedCountry)).toUpperCase():''}</h2>
     ${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}
   </div>
-  ${state.scope==='city' ? `
+  ${cityViewId() ? `
   <div class="track-list" id="homeCityList">
     <div class="empty-msg">Chargement…</div>
   </div>
@@ -2502,19 +2550,19 @@ function renderHome(){
   <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
   ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : `
   <div class="track-list">
-    ${list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)).join('')}
+    ${list.length===0 ? `<div class="empty-msg">Classement bientôt disponible pour ce genre.</div>` : list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)).join('')}
   </div>
   ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}`}
   <div style="height:8px;"></div>
   `;
 }
 async function loadHomeCityList(){
-  if(state.scope!=='city') return;
-  const appCityId = state.selectedCity;
+  const appCityId = cityViewId();
+  if(!appCityId) return;
   const platform = state.homeCityPlatform || 'spotify';
-  const period = state.cityPeriod || 'today';
+  const period = state.period || 'today';
   const entries = await fetchRealCityChart(appCityId, platform, period);
-  if(state.scope!=='city' || state.selectedCity!==appCityId || state.homeCityPlatform!==platform || state.cityPeriod!==period) return; // user moved on
+  if(cityViewId()!==appCityId || state.homeCityPlatform!==platform || state.period!==period) return; // user moved on
   const host = document.getElementById('homeCityList');
   if(host) host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS });
 }
@@ -3454,7 +3502,8 @@ document.addEventListener('click', async (e)=>{
   else if(a==='set-lang'){ setLang(el.dataset.lang); }
 });
 document.addEventListener('change', (e)=>{
-  if(e.target.dataset.action==='select-country'){ state.selectedCountry = e.target.value; renderView(); }
+  if(e.target.dataset.action==='select-country'){ state.selectedCountry = e.target.value; state.countryCity = ''; renderView(); }
+  if(e.target.dataset.action==='select-country-city'){ state.countryCity = e.target.value; renderView(); }
   if(e.target.dataset.action==='select-city'){ state.selectedCity = e.target.value; renderView(); }
 });
 
