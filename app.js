@@ -1508,19 +1508,21 @@ function coverStyle(genreId, seed){
 function coverInitials(title){
   return title.replace(/\(.*?\)/g,'').trim().split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 }
+// Pochettes Deezer exclues (conditions non commerciales) : on utilise l'artwork Apple à la place (voir pumpCoverQueue).
+function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com/i.test(u)) ? u : null; }
 function coverHTML(t, big){
   const playing = state.playingId===t.id;
   // Real Beatport cover art is hotlinked from Beatport's own public CDN (the same
   // thumbnail URLs their site serves) — if it ever fails to load, the generative
   // artwork underneath shows through instead of a broken image.
-  const img = t.coverUrl ? `<img src="${t.coverUrl}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;">` : '';
+  const img = safeCover(t.coverUrl) ? `<img src="${safeCover(t.coverUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;">` : '';
   // Badge visible AVANT même d'appuyer sur play quand on a un identifiant
   // vérifié (Spotify/YouTube, jamais deviné) — sinon seulement une fois
   // qu'Apple Music a confirmé un extrait (ça, ça ne se sait qu'après coup).
   const verified = !!(t.spotifyId || t.youtubeId);
   const spotifyBadge = (verified || t.itunesPreviewUrl) ? `<div style="position:absolute;top:4px;right:4px;width:16px;height:16px;border-radius:50%;background:#fc3d62;display:flex;align-items:center;justify-content:center;font-size:9px;box-shadow:0 0 0 2px rgba(0,0,0,.35);" title="${verified?'Morceau vérifié (Spotify/YouTube)':'Extrait audio réel disponible (Apple Music)'}">✓</div>` : '';
   return `<div class="cover-wrap">
-    <div class="cover${big?' lg':''}" ${(!t.coverUrl && t.isRealCity)?`data-lazycover="${t.id}"`:''} style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
+    <div class="cover${big?' lg':''}" ${(!safeCover(t.coverUrl) && t.isRealCity)?`data-lazycover="${t.id}"`:''} style="${coverStyle(t.genre, t.coverSeed)}position:relative;overflow:hidden;">${coverInitials(t.title)}${img}${spotifyBadge}</div>
     <button class="play-overlay${big?' lg':''}${playing?' playing':''}" data-action="toggle-play" data-id="${t.id}" aria-label="Écouter l'extrait">${playing?'⏸':'▶'}</button>
   </div>`;
 }
@@ -1960,7 +1962,7 @@ async function pumpCoverQueue(){
   if(coverBusy) return; coverBusy = true;
   while(coverQueue.length){
     const el = coverQueue.shift(); const t = realTracksCache[el.dataset.lazycover];
-    if(!t || !el.isConnected || t.coverUrl) continue;
+    if(!t || !el.isConnected || safeCover(t.coverUrl)) continue;
     const hit = await lookupItunesPreview(t);
     if(hit && hit.artwork){
       t.coverUrl = hit.artwork;
