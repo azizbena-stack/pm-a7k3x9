@@ -696,6 +696,22 @@ async function authSignOut(){
   authSession = null;
   setStoredSession(null);
 }
+// Suppression de compte (exigée par Google Play) : appelle la fonction SQL delete_my_account (voir publication/delete_my_account.sql).
+async function deleteMyAccount(){
+  const s = await ensureFreshSession();
+  if(!s){ state.confirmDelete = false; toast(tr('profile.deleteFail')); renderView(); return; }
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_my_account`, { method:'POST', headers: authHeaders(s), body:'{}' });
+    if(!res.ok) throw new Error(res.status);
+    authSession = null; setStoredSession(null);
+    state.confirmDelete = false; state.user = null; state.view = 'home';
+    authMode = 'login'; authError = null;
+    document.getElementById('appScreen').classList.add('hidden');
+    document.getElementById('authScreen').classList.remove('hidden');
+    renderAuthScreen();
+    toast(tr('toast.accountDeleted'));
+  }catch(e){ state.confirmDelete = false; toast(tr('profile.deleteFail')); renderView(); }
+}
 // Refreshes the access token if it's near expiry. Returns null (never
 // throws) if there's no usable session — callers fall back to local-only.
 async function ensureFreshSession(){
@@ -905,6 +921,12 @@ const I18N = {
     'profile.noMatch': `Pas encore de correspondance.`,
     'profile.admin': `🛠️ Admin Dashboard`,
     'profile.logout': `Se déconnecter`,
+    'profile.deleteAccount': `Supprimer mon compte`,
+    'profile.deleteConfirm': `Cette action efface définitivement ton compte et ton profil. Elle est irréversible.`,
+    'profile.deleteYes': `Oui, supprimer définitivement`,
+    'profile.deleteNo': `Annuler`,
+    'toast.accountDeleted': `Compte supprimé.`,
+    'profile.deleteFail': `Suppression impossible. Reconnecte-toi puis réessaie.`,
     'profile.footer': `© 2026 Bena — Pulse Music.<br>Tous droits réservés. Logiciel propriétaire — voir LICENSE.txt.`,
     'profile.language': `Langue`,
     'track.detailTitle': `FICHE MORCEAU`,
@@ -1053,6 +1075,12 @@ const I18N = {
     'profile.noMatch': `No match yet.`,
     'profile.admin': `🛠️ Admin Dashboard`,
     'profile.logout': `Log out`,
+    'profile.deleteAccount': `Delete my account`,
+    'profile.deleteConfirm': `This permanently deletes your account and profile. It cannot be undone.`,
+    'profile.deleteYes': `Yes, delete permanently`,
+    'profile.deleteNo': `Cancel`,
+    'toast.accountDeleted': `Account deleted.`,
+    'profile.deleteFail': `Could not delete. Log in again and retry.`,
     'profile.footer': `© 2026 Bena — Pulse Music.<br>All rights reserved. Proprietary software — see LICENSE.txt.`,
     'profile.language': `Language`,
     'track.detailTitle': `TRACK DETAILS`,
@@ -1201,6 +1229,12 @@ const I18N = {
     'profile.noMatch': `Aún no hay coincidencias.`,
     'profile.admin': `🛠️ Panel de Administración`,
     'profile.logout': `Cerrar sesión`,
+    'profile.deleteAccount': `Eliminar mi cuenta`,
+    'profile.deleteConfirm': `Esto elimina para siempre tu cuenta y tu perfil. No se puede deshacer.`,
+    'profile.deleteYes': `Sí, eliminar definitivamente`,
+    'profile.deleteNo': `Cancelar`,
+    'toast.accountDeleted': `Cuenta eliminada.`,
+    'profile.deleteFail': `No se pudo eliminar. Vuelve a iniciar sesión e inténtalo de nuevo.`,
     'profile.footer': `© 2026 Bena — Pulse Music.<br>Todos los derechos reservados. Software propietario — ver LICENSE.txt.`,
     'profile.language': `Idioma`,
     'track.detailTitle': `FICHA DEL TEMA`,
@@ -1349,6 +1383,12 @@ const I18N = {
     'profile.noMatch': `Noch keine Übereinstimmung.`,
     'profile.admin': `🛠️ Admin-Dashboard`,
     'profile.logout': `Abmelden`,
+    'profile.deleteAccount': `Mein Konto löschen`,
+    'profile.deleteConfirm': `Dein Konto und dein Profil werden endgültig gelöscht. Das kann nicht rückgängig gemacht werden.`,
+    'profile.deleteYes': `Ja, endgültig löschen`,
+    'profile.deleteNo': `Abbrechen`,
+    'toast.accountDeleted': `Konto gelöscht.`,
+    'profile.deleteFail': `Löschen nicht möglich. Melde dich erneut an und versuche es noch einmal.`,
     'profile.footer': `© 2026 Bena — Pulse Music.<br>Alle Rechte vorbehalten. Proprietäre Software — siehe LICENSE.txt.`,
     'profile.language': `Sprache`,
     'track.detailTitle': `TRACK-DETAILS`,
@@ -2721,6 +2761,7 @@ function renderProfile(){
   <div class="hpad" style="display:flex;flex-direction:column;gap:9px;">
     <button class="btn btn-outline btn-block" data-action="open-admin">${tr('profile.admin')}</button>
     <button class="btn btn-ghost btn-block" data-action="logout">${tr('profile.logout')}</button>
+    ${authSession ? (state.confirmDelete ? `<div style="border:1px solid #c0392b;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;"><div style="font-size:12px;line-height:1.4;">${tr('profile.deleteConfirm')}</div><button class="btn btn-block" style="background:#c0392b;color:#fff;" data-action="delete-account-confirm">${tr('profile.deleteYes')}</button><button class="btn btn-ghost btn-block" data-action="delete-account-cancel">${tr('profile.deleteNo')}</button></div>` : `<button class="btn btn-ghost btn-block" style="color:#ff6b6b;" data-action="delete-account">${tr('profile.deleteAccount')}</button>`) : ''}
   </div>
   <div style="text-align:center;font-size:10px;color:var(--text-muted);padding:16px 24px 4px;line-height:1.6;">${tr('profile.footer')}</div>
   <div style="height:12px;"></div>`;
@@ -3192,6 +3233,9 @@ document.addEventListener('click', async (e)=>{
     document.getElementById('authScreen').classList.remove('hidden');
     renderAuthScreen();
   }
+  else if(a==='delete-account'){ state.confirmDelete = true; renderView(); }
+  else if(a==='delete-account-cancel'){ state.confirmDelete = false; renderView(); }
+  else if(a==='delete-account-confirm'){ deleteMyAccount(); }
   else if(a==='logout-to-auth'){
     authMode = 'login'; authError = null;
     document.getElementById('appScreen').classList.add('hidden');
