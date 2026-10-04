@@ -302,7 +302,8 @@ button{font-family:inherit;}
 <!-- ADMIN (breaks out of phone frame) -->
 <div id="adminOverlay" class="admin-root hidden"></div>
 
-<script>/* =========================================================================
+<script>
+/* =========================================================================
    Pulse Music — MVP interactive prototype
    Single-file demo app. All data below is synthetic/mocked for demonstration.
    ========================================================================= */
@@ -339,17 +340,16 @@ const TODAY = new Date('2026-08-15');
 const GENRES = [
   {id:'afro-house',    name:'Afro House',        color:'#3987e5'},
   {id:'afro-tech',      name:'Afro Tech',          color:'#d95926'},
-  {id:'house',          name:'House',              color:'#199e70'},
   {id:'deep-house',     name:'Deep House',         color:'#c98500'},
   {id:'organic-house',  name:'Organic House',      color:'#d55181'},
   {id:'melodic-house',  name:'Melodic House',      color:'#008300'},
   {id:'melodic-techno', name:'Melodic Techno',     color:'#9085e9'},
-  {id:'tech-house',     name:'Tech House',         color:'#e66767'},
   {id:'progressive-house', name:'Progressive House', color:'#3987e5'},
-  {id:'techno',         name:'Techno',             color:'#d95926'},
   {id:'minimal-deeptech', name:'Minimal / Deep Tech', color:'#199e70'},
-  {id:'indie-dance',    name:'Indie Dance',        color:'#c98500'},
   {id:'tribal-house',   name:'Tribal House',       color:'#d55181'},
+  // "House", "Techno", "Tech House" et "Indie Dance" retirés du catalogue le
+  // 2026-10-04 sur demande explicite — plus de morceaux, plus de filtre, plus
+  // de chip pour ces 4 genres.
 ];
 const genreById = id => GENRES.find(g=>g.id===id);
 
@@ -560,7 +560,7 @@ function realTrackMoveHTML(rank, prev){
 // jamais présenter une donnée fabriquée comme si elle venait de Soundcharts.
 // cityTrackGenre() reste UNIQUEMENT pour varier la couleur/texture de la pochette
 // (coverStyle) — jamais affiché en texte, jamais utilisé pour filtrer la liste Ville.
-const CITY_PSEUDO_GENRES = ['afro-house','afro-tech','house','melodic-house','melodic-techno','techno'];
+const CITY_PSEUDO_GENRES = ['afro-house','afro-tech','melodic-house','melodic-techno'];
 function cityTrackGenre(title, artist){
   const seedKey = (title||'')+'|'+(artist||'');
   return CITY_PSEUDO_GENRES[strSeed(seedKey) % CITY_PSEUDO_GENRES.length];
@@ -667,17 +667,6 @@ const REAL_TRACKS = [
   {title:'Yamore (Extended)', artist:'Salif Keita, Cesaria Evora, MoBlack, Franc Fala, Benja (NL)', genre:'tribal-house', label:'Decca Records France', chartRank:10, cover:BP_IMG('b1089579-c8a6-4ee4-8bb4-f3d333197d1b'), spotifyId:'04l6CQdt3SqYNwREH0K741'},
   {title:"La Verdolaga (feat. Totó La Momposina) (Extended Mix)", artist:'Toto La Momposina, HUGEL', genre:'tribal-house', label:'Defected', chartRank:15, cover:BP_IMG('cb616350-7761-4506-937d-0a8065b656d3'), spotifyId:'1SHDkI7ZAD0qGfEO38D87o'},
 
-  // House — beatport.com/genre/house/5/top-100
-  {title:'4Get The Girl (Mellizos Extended Remix)', artist:'Route 94, Mellizos', genre:'house', label:'Defected', chartRank:1, cover:BP_IMG('a5b23ca0-1597-4b8c-9c26-f548a4bb374a')},
-  {title:'Good Girl (Extended Mix)', artist:'Tristan Henry, Cloonee, Prospa', genre:'house', label:'Hellbent Records', chartRank:2, cover:BP_IMG('3f53a915-e682-4865-acc9-06339a3ddde8'), spotifyId:'263Ecah3YA4hVZHxR2Ex9p'},
-  {title:'Free Your Mind (Extended Mix)', artist:'Cloonee, Prospa', genre:'house', label:'CircoLoco Records', chartRank:3, cover:BP_IMG('68d19d58-caeb-431c-8375-be7415f16966'), spotifyId:'6TWbY1dq8eYtFiMiGdBlOa'},
-  {title:'Hey Everybody (Extended Mix)', artist:'Kolter', genre:'house', label:'Positiva', chartRank:4, cover:BP_IMG('96ff70f5-947a-4223-9f17-59a93afd60f3'), spotifyId:'25PFZE1QqJieWRIJOCk755'},
-  {title:'Talk To You (Extended Mix)', artist:'ANOTR, 54 Ultra', genre:'house', label:'NO ART', chartRank:5, cover:BP_IMG('e3044e43-9425-4575-9587-a224c9e5d2c1'), spotifyId:'5zEcbencrcP0p5Z8508vWz'},
-  {title:'Little More (Body Action)', artist:'Sean Doron', genre:'house', label:"You&Me Records", chartRank:6, cover:BP_IMG('da6916ac-d684-4977-abec-4f88cc4c8025')},
-  {title:'Want To Know (Extended Mix)', artist:'Rooléh', genre:'house', label:'No Art', chartRank:7, cover:BP_IMG('9958200d-7207-46b8-ad04-324741a80da2')},
-  {title:'Shinjuku (Extended Mix)', artist:'Franky Rizardo', genre:'house', label:'LTF Records', chartRank:8, cover:BP_IMG('9686c89c-082e-422d-8fa7-136a2b640ce4'), spotifyId:'0niU8VMrQzSNhrmsiLlmeS'},
-  {title:'All Night Long (Extended Mix)', artist:'Ferra Black, Chico Rose (NL)', genre:'house', label:'LTF Records', chartRank:9, cover:BP_IMG('777682f1-12e6-4767-9561-d8f63fc70098')},
-
   // Deep House — beatport.com/genre/deep-house/12/top-100
   {title:'What We Got', artist:'Midas Field, Marijn Jansen', genre:'deep-house', label:'tszr', chartRank:1, cover:BP_IMG('1c149979-c34c-4f4e-ba54-644389d976a5')},
   {title:'Trapped', artist:'Kolter', genre:'deep-house', label:'Koltrax', chartRank:2, cover:BP_IMG('8f90ebd0-dc36-43e4-a257-2dd4969c7a31'), spotifyId:'7LhaYxesZoZQ8b9WJGuLDx'},
@@ -721,17 +710,6 @@ const REAL_TRACKS = [
   {title:'333 (Extended)', artist:'Super Flu, Peace Control, Eric Reyes', genre:'melodic-techno', label:'Didschn', chartRank:14, cover:BP_IMG('ca085f9c-1fc9-4eaf-9379-b7dbac074845')},
   {title:'Crossing', artist:'HotLap', genre:'melodic-techno', label:'Global Underground', chartRank:17, cover:BP_IMG('f7b97c1d-3c20-4a05-a247-46d594134b92')},
 
-  // Tech House — beatport.com/genre/tech-house/11/top-100
-  {title:'Beat Goes On', artist:'Rafael, Adam Ten', genre:'tech-house', label:'Maccabi House', chartRank:1, cover:BP_IMG('aed932b2-4481-46ee-9661-a48f52a79ee5'), spotifyId:'4WHvIDcDOcAVrsI5BxPGBM'},
-  {title:'MYSTERY OF RAW', artist:'Wu-Tang Clan, Michael Bibi, Kettama', genre:'tech-house', label:'CircoLoco Records', chartRank:2, cover:BP_IMG('0081a294-434d-4d4f-a5b4-8d9eac715593'), spotifyId:'2v4NP088R6LUgFBDF9JqBg'},
-  {title:'Body Shake', artist:'Max Styler', genre:'tech-house', label:'Nu Moda', chartRank:3, cover:BP_IMG('f7988cd7-211b-412d-9283-f873cb8530fb'), spotifyId:'3oToDCuXNWSgqkxtPKQM3b'},
-  {title:'Reason Why', artist:'Sapian', genre:'tech-house', label:'Prophecy', chartRank:4, cover:BP_IMG('7d2c3455-4d87-447d-a0b9-129bb4488f0f')},
-  {title:'Stay Sexy', artist:'Mili, HUGEL, LaBritney', genre:'tech-house', label:'Make The Girls Dance Records', chartRank:5, cover:BP_IMG('147b990b-5790-4617-9e45-82cd52939f33'), spotifyId:'51ebEtVMk572G7rln7lims'},
-  {title:'I Never Knew', artist:'Adam Ten', genre:'tech-house', label:'Defected', chartRank:6, cover:BP_IMG('700c55a3-a434-4482-9bd5-ab8f45e99108'), spotifyId:'54vF34GSMXYZfjPXMsHYWf'},
-  {title:'wtf', artist:'Roland Clark, DvirNuns, Broken Hill', genre:'tech-house', label:'THRIVE MUSIC', chartRank:7, cover:BP_IMG('f2efbc21-6169-440a-9d10-158b5836d9f5'), spotifyId:'0gsCoEAU0OOr4lXNEgXhgW'},
-  {title:'Never Leave U', artist:'Sonny Kane', genre:'tech-house', label:'Boat Club Records', chartRank:8, cover:BP_IMG('ee52762e-d265-4ce7-bd01-d81c60ed3ad2'), spotifyId:'23khOJxVCE4SEDYCf4mZb8'},
-  {title:'Late Night Baddies', artist:'MALARKEY, Gaskin, Tom Did It', genre:'tech-house', label:'Bass Jamz', chartRank:9, cover:BP_IMG('e5e065ea-403c-47f4-a32e-1537f2b5db0a')},
-
   // Progressive House — beatport.com/genre/progressive-house/15/top-100
   {title:'Rise', artist:'Guy J', genre:'progressive-house', label:'Global Underground', chartRank:1, cover:BP_IMG('bb973753-28af-48a3-a563-da35ea3e0654'), spotifyId:'3r6mlzTxJ88gBZaXLQ95M8'},
   {title:'Iguana', artist:'Maze 28', genre:'progressive-house', label:'Meanwhile', chartRank:2, cover:BP_IMG('5b873ce4-2fdb-4b5a-a471-49d96bd1add2'), spotifyId:'4mEfQZMtdHx70plj7PAPPb'},
@@ -742,16 +720,6 @@ const REAL_TRACKS = [
   {title:'Go', artist:'HANA, Ezequiel Arias', genre:'progressive-house', label:'Anjunadeep', chartRank:7, cover:BP_IMG('52cc0116-6fe9-4232-a566-516575011ae1'), spotifyId:'19qaByyKLCD9R2raOpD13U'},
   {title:'Be My High', artist:'Redspace, Poli-Poli', genre:'progressive-house', label:'AMOX Frequencies', chartRank:8, cover:BP_IMG('f3d79f2f-1aa6-4007-a1e0-ab909fd78d56')},
 
-  // Techno (Peak Time/Driving) — beatport.com/genre/techno-peak-time-driving/6/top-100
-  {title:"Don't Mess With Us", artist:'Victor Ruiz, Kaufmann (DE)', genre:'techno', label:'VOLTA', chartRank:1, cover:BP_IMG('11ac23f4-28d2-4de0-96d9-9371be8dbbf2'), spotifyId:'7aYuudVpLDpY3d3I4YoXUQ'},
-  {title:'Liquid Hook (Victor Ruiz Remix)', artist:'Liquid Soul, Victor Ruiz, Captain Hook', genre:'techno', label:'Iboga Records', chartRank:2, cover:BP_IMG('4b231cd8-1504-410a-a13d-6fcdeabdb41f'), spotifyId:'1HNRoHRSHSIJqvywZgj1GO'},
-  {title:'Vibrancy (Kos:mo Remix)', artist:'UMEK', genre:'techno', label:'1605', chartRank:3, cover:BP_IMG('693d0f5b-92c8-4c51-aecd-2cd1d0fbb116'), spotifyId:'4AGbgD8EmhPwCMO4uEZlX3'},
-  {title:'K.O.', artist:'Oliver Huntemann, Kaufmann (DE)', genre:'techno', label:'Drumcode', chartRank:4, cover:BP_IMG('2e43d6d6-5681-4b4d-9c36-eafb12c301a8'), spotifyId:'6cShjebz9q8ika8tyssGOa'},
-  {title:'Dancing', artist:'19:26, Bittermind', genre:'techno', label:'Drumcode', chartRank:5, cover:BP_IMG('33fdf53a-9941-47a6-a25a-93a8d0595238'), spotifyId:'1oyHVXCaR3TSlD4p2kWdz1'},
-  {title:'The Realm', artist:'Layton Giordani, KASIA (ofc)', genre:'techno', label:'Drumcode', chartRank:6, cover:BP_IMG('19b27928-126a-406e-914f-0b737ec04607'), spotifyId:'2KtVx4lNWEgRW7UXGxJZwO'},
-  {title:'No Mercy', artist:'Armin van Buuren, Adam Beyer', genre:'techno', label:'Drumcode', chartRank:7, cover:BP_IMG('1fcb7780-e4fb-4488-a84e-2cef11ff7343'), spotifyId:'4pLwmpLa11SfOVakFQvIxk'},
-  {title:'Proton', artist:'Alignment, Space 92', genre:'techno', label:'TAKEOFF', chartRank:8, cover:BP_IMG('b7857e27-5b2e-4443-aeae-41ea466ab299'), spotifyId:'2AzAamWZi47Fv7nds8h7AM'},
-
   // Minimal / Deep Tech — beatport.com/genre/minimal-deep-tech/14/top-100
   {title:'Can You Feel The Bass', artist:'Local Dub', genre:'minimal-deeptech', label:"You&Me Records", chartRank:1, cover:BP_IMG('15862b4e-757b-45d3-93e9-e350f2eb2a94'), spotifyId:'4gALmStbKnYZWsBv2hJcGI'},
   {title:'Work It', artist:'SEBS', genre:'minimal-deeptech', label:'Atlantic Records UK', chartRank:2, cover:BP_IMG('2dfbe133-70d3-4afd-a815-89382e05239f'), spotifyId:'3xcgtqFTfz0KX3JiOvooJM'},
@@ -761,16 +729,6 @@ const REAL_TRACKS = [
   {title:'Reaction', artist:'Local Dub', genre:'minimal-deeptech', label:"You&Me Records", chartRank:6, cover:BP_IMG('15862b4e-757b-45d3-93e9-e350f2eb2a94'), spotifyId:'6GhfGMVMtrkLyPuPeb1Rkp'},
   {title:'Move Shake', artist:'Jeff Sorkowitz', genre:'minimal-deeptech', label:'IN / ROTATION - Insomniac Records', chartRank:7, cover:BP_IMG('afd9b4bd-fb4c-4635-953f-8e416cf131d6'), spotifyId:'3zJ3HnuFWvYGNeVxafs4mu'},
   {title:'XTC', artist:'Mike Morrisey, BLND (UK)', genre:'minimal-deeptech', label:'Metamorfosi Records', chartRank:8, cover:BP_IMG('534b4571-178a-409d-8883-c635ee21447d')},
-
-  // Indie Dance — beatport.com/genre/indie-dance/37/top-100
-  {title:'Work', artist:'Gabss', genre:'indie-dance', label:'NO DISCO', chartRank:1, cover:BP_IMG('b296a9be-a33a-4011-8c54-cb178420ead6'), spotifyId:'1rpdapoYtP0nk1zK01FZT9'},
-  {title:'Panjab (Extended Mix)', artist:'Sphynx, GROSSOMODDO', genre:'indie-dance', label:'Make The Girls Dance Records', chartRank:2, cover:BP_IMG('b3f50356-d4ee-41b4-93a2-04f72cd391c3')},
-  {title:'Freak (Extended Mix)', artist:'HIGHLITE, Peredel', genre:'indie-dance', label:'Nomo Music', chartRank:3, cover:BP_IMG('74032e84-f772-472b-842e-0fb7603b51cf')},
-  {title:'Tu Es Tout (Extended Mix)', artist:'Tom & Collins', genre:'indie-dance', label:"SPINNIN' DEEP", chartRank:4, cover:BP_IMG('3f2d33d6-957a-42d5-8d13-67fd55b76c54'), spotifyId:'34OVYem9gbZQwKFdOC6Hxs'},
-  {title:'Rock Like This', artist:'Amour Propre', genre:'indie-dance', label:'Diynamic', chartRank:5, cover:BP_IMG('d9737289-2313-475b-9d7f-a94250210ca3'), spotifyId:'2PCu3SAbFOR3xf05PIvla4'},
-  {title:'Synth Lines', artist:'Alexey Union, David LeSal, Broken Hill, STAY GOLDEN', genre:'indie-dance', label:'All Day I Dream', chartRank:6, cover:BP_IMG('de7d0304-1751-4ee5-a381-4382bf189818'), spotifyId:'4L2ADNUv49ViqB0MEbhrj4'},
-  {title:'Silent Covenant', artist:'STAY GOLDEN', genre:'indie-dance', label:'All Day I Dream', chartRank:7, cover:BP_IMG('de7d0304-1751-4ee5-a381-4382bf189818'), spotifyId:'2BSjHcyVsGiWP5XYFj1eNH'},
-  {title:'Spring Girl (Extended)', artist:'Maori, Adam Ten', genre:'indie-dance', label:'Higher Ground', chartRank:8, cover:BP_IMG('36f4689b-315f-4a69-aa3e-37a2c087a4dc'), spotifyId:'6JNtrXY6BmWdew481iWXbl'},
 ];
 
 /* ---------------------------- TRACK GENERATION --------------------------- */
@@ -1922,7 +1880,7 @@ function playTrack(t){
   try{ ctx = ensureAudioCtx(); if(ctx.state==='suspended') ctx.resume(); }
   catch(e){ toast('Lecture audio indisponible sur ce navigateur.'); return; }
 
-  const prof = t.demoProfile || GENRE_SOUND[t.genre] || GENRE_SOUND['house'];
+  const prof = t.demoProfile || GENRE_SOUND[t.genre] || GENRE_SOUND['afro-house'];
   // ±12% tempo jitter seeded per track, so even two tracks sharing a profile
   // don't play at the exact same speed.
   const bpmJitter = 0.88 + mulberry32((t.coverSeed||0)+7)()*0.24;
@@ -2054,16 +2012,6 @@ function stopPlayback(){
 // preview is always shown next to a link to open the track in Apple Music
 // (see renderMiniPlayer / track overlay).
 const itunesCache = {};
-// Deezer en repli : certains titres électroniques/underground issus de
-// Beatport n'existent pas dans le catalogue Apple Music (recherche iTunes
-// ci-dessus) mais existent chez Deezer, qui couvre souvent mieux ce
-// répertoire. L'API Deezer n'autorise pas les appels directs depuis le
-// navigateur (pas d'en-tête CORS) donc on passe par notre propre fonction
-// serveur deezer-preview qui fait l'appel à notre place et renvoie
-// uniquement { preview, trackTitle, artistName }. Même règle de cache que
-// pour iTunes : null = "vraiment rien trouvé", undefined = "pas encore
-// cherché".
-const deezerCache = {};
 // A silent ~0s WAV, used only to "prime" the shared <audio> element below —
 // see ensureItunesAudioEl for why.
 const SILENT_AUDIO_DATA_URI = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
@@ -2090,84 +2038,17 @@ function ensureItunesAudioEl(){
   return itunesAudioEl;
 }
 // ------------------------------------------------------------------------
-// Lecture Spotify "cachée" — pour que l'appli garde sa propre identité et ne
-// montre jamais le lecteur/logo Spotify, on pilote un contrôleur officiel
-// (API iFrame de Spotify, gratuite, sans connexion) depuis un cadre quasi
-// invisible plutôt que d'afficher leur widget. IMPORTANT : jamais
-// display:none sur ce cadre — la plupart des navigateurs mettent en pause
-// tout contenu intégré en display:none, on le réduit donc à 1px et une
-// opacité quasi nulle à la place, ce qui le laisse "affiché" techniquement.
-let spotifyController = null;
-let spotifyControllerEl = null;
-let spotifyControllerReadyPromise = null;
-let spotifyCurrentUri = null;
-function ensureSpotifyControllerHost(){
-  if(spotifyControllerEl) return spotifyControllerEl;
-  spotifyControllerEl = document.createElement('div');
-  spotifyControllerEl.id = 'spotifyEmbedHost';
-  spotifyControllerEl.style.cssText = 'position:fixed; width:1px; height:1px; opacity:0.01; overflow:hidden; pointer-events:none; left:-9999px; bottom:0;';
-  document.body.appendChild(spotifyControllerEl);
-  return spotifyControllerEl;
-}
-function loadSpotifyController(firstUri){
-  if(spotifyControllerReadyPromise) return spotifyControllerReadyPromise;
-  spotifyControllerReadyPromise = new Promise((resolve)=>{
-    // L'API peut être lente à charger (ou bloquée par le réseau) — on
-    // n'attend pas indéfiniment, sinon le bouton play resterait figé en
-    // "chargement" pour rien ; le code appelant bascule alors sur le widget
-    // visible classique plutôt que de laisser l'utilisateur sans rien.
-    const giveUp = setTimeout(()=>resolve(null), 5000);
-    window.onSpotifyIframeApiReady = (IFrameAPI) => {
-      try{
-        const host = ensureSpotifyControllerHost();
-        IFrameAPI.createController(host, { uri: firstUri, width:'1', height:'1' }, (controller) => {
-          clearTimeout(giveUp);
-          spotifyController = controller;
-          spotifyCurrentUri = firstUri;
-          resolve(controller);
-        });
-      }catch(e){ clearTimeout(giveUp); resolve(null); }
-    };
-    if(!document.getElementById('spotifyIframeApiScript')){
-      const s = document.createElement('script');
-      s.id = 'spotifyIframeApiScript';
-      s.src = 'https://open.spotify.com/embed/iframe-api/v1';
-      s.async = true;
-      s.onerror = () => resolve(null);
-      document.body.appendChild(s);
-    }
-  });
-  return spotifyControllerReadyPromise;
-}
-function startSpotifyHiddenPlayback(controller, uri, id){
-  let confirmed = false;
-  const onUpdate = (e) => {
-    if(e && !e.isPaused){
-      confirmed = true;
-      if(state.playingId===id){ state.playingReal = true; updatePlayerUI(); }
-    }
-  };
-  try{ controller.addListener('playback_update', onUpdate); }catch(e){}
-  const doPlay = () => { try{ controller.play(); }catch(e){} };
-  if(spotifyCurrentUri !== uri){
-    spotifyCurrentUri = uri;
-    try{ controller.loadUri(uri); }catch(e){}
-    setTimeout(doPlay, 250); // laisse le temps au chargement du nouvel URI avant de lancer la lecture
-  } else {
-    doPlay();
-  }
-  // Si après un délai raisonnable aucun évènement "ça joue vraiment" n'est
-  // arrivé (autoplay bloqué par le navigateur, typiquement iPhone), on
-  // bascule sur le widget Spotify visible classique — l'utilisateur appuie
-  // alors une fois dans le cadre qui apparaît, exactement comme avant,
-  // plutôt que de rester sur un bouton play qui ne fait rien.
-  setTimeout(()=>{
-    if(!confirmed && state.playingId===id && state.playingEmbed==='spotify-hidden'){
-      state.playingEmbed = 'spotify';
-      updatePlayerUI();
-    }
-  }, 2500);
-}
+// Lecture Spotify — 2026-10-04 : le contrôleur "caché" (API iFrame pilotée
+// depuis un cadre réduit à 1px, logo/widget jamais affichés) a été retiré.
+// Vérifié dans les Widget Terms of Use de Spotify : "You shall display the
+// Spotify Widgets in the form made available by Spotify, without
+// alteration" / "You shall not obfuscate the Spotify Widgets in any way...
+// or alter the form or format." Masquer le widget violait donc directement
+// leurs conditions (risque réel : coupure de l'accès à leur API). Un morceau
+// avec spotifyId utilise maintenant systématiquement le vrai widget visible
+// (voir renderMiniPlayer, branche playingEmbed==='spotify') — plus de
+// contrôleur caché, plus de bascule automatique vers lui.
+let spotifyController = null; // reste à null désormais ; gardé seulement pour que stopPlayback() plus bas reste inoffensif
 // {ok:true, hit:obj|null} on a completed request (hit is null = Apple genuinely
 // has nothing for this query) — {ok:false} on a network error/timeout, which
 // is NOT the same thing and must never be cached as a permanent "no match"
@@ -2280,43 +2161,10 @@ async function lookupItunesPreview(t){
   itunesCache[key] = null; // every attempt completed and genuinely found nothing — a real, cacheable negative
   return null;
 }
-async function lookupDeezerPreview(t){
-  const key = t.id;
-  if(deezerCache[key] !== undefined) return deezerCache[key];
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = controller ? setTimeout(()=>controller.abort(), 6000) : null;
-  try{
-    const q = `title=${encodeURIComponent(t.title)}&artist=${encodeURIComponent(t.artist||'')}`;
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/deezer-preview?${q}`, {
-      headers: SUPABASE_HEADERS,
-      ...(controller ? {signal: controller.signal} : {})
-    });
-    if(!res.ok){ return null; } // transient failure — leave uncached so the next tap retries
-    const data = await res.json();
-    const hit = (data && data.preview) ? { previewUrl: data.preview, trackViewUrl: null } : null;
-    deezerCache[key] = hit; // a completed request, hit or genuine miss, is cacheable either way
-    return hit;
-  }catch(e){ return null; /* network/timeout error — not a confirmed absence, stays uncached */ }
-  finally{ if(timer) clearTimeout(timer); }
-}
 async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   if(state.playingId===id){ stopPlayback(); return; }
-  // Débloque le contexte Web Audio (moteur de la boucle générée, dernier
-  // recours ci-dessous) DANS CE TAP, de façon synchrone, avant tout
-  // "await" — sans ça, si ce morceau finit par retomber jusqu'à la boucle
-  // générée après un ou deux appels réseau (iTunes puis Deezer), le
-  // navigateur mobile peut considérer qu'on n'est plus "dans le geste de
-  // l'utilisateur" et refuser silencieusement de démarrer l'audio : aucun
-  // extrait ne joue, aucune erreur visible, juste un tap qui ne fait rien.
-  // Trouvé le 2026-10-03 (ajout de Deezer ci-dessous, qui allonge l'attente
-  // avant la boucle générée) : correspond à "il manque un morceau sur 10"
-  // — un morceau sans correspondance iTunes/Deezer/Spotify/YouTube qui ne
-  // jouait plus du tout. Appeler resume() ici, tôt et sans l'attendre,
-  // suffit à "déverrouiller" le contexte pour le reste de ce tap même si
-  // playTrack() ne s'exécute vraiment que bien plus tard.
-  try{ const c = ensureAudioCtx(); if(c.state==='suspended') c.resume().catch(()=>{}); }catch(e){}
   // Priority order (revised: a confirmed mobile test showed the hidden
   // Spotify controller can report "playing" while staying silent — a
   // cross-origin iframe's autoplay can be blocked by the phone's browser
@@ -2324,95 +2172,69 @@ async function togglePlay(id){
   // is no way to detect that from here. A real <audio> tag has none of
   // that risk and is the one method already confirmed audible on iPhone,
   // so it now comes first for every track, verified ID or not):
-  //  1. An iTunes or Deezer preview already resolved earlier this session
-  //     for THIS track — smoothest (single tap, no embed) and already
-  //     verified.
-  //  2. Fresh iTunes Search + Deezer Search lookups, run IN PARALLEL (not
-  //     one after the other — a sequential iTunes-then-Deezer chain nearly
-  //     doubled the wait for any track neither one has, which is exactly
-  //     what made the AudioContext-unlock bug above easy to hit), tried for
-  //     EVERY track including ones with a verified spotifyId/youtubeId. For
-  //     those, the title/artist used for the query are our own clean
-  //     catalogue data (not scraped/guessed text), so a match is
-  //     high-confidence — and the result is a real, branding-free 30s
-  //     <audio> preview. iTunes wins if both happen to match.
+  //  1. An iTunes preview already resolved earlier this session for THIS
+  //     track — smoothest (single tap, no embed) and already verified.
+  //  2. A fresh iTunes Search API lookup, tried for EVERY track including
+  //     ones with a verified spotifyId/youtubeId. For those, the title and
+  //     artist used for the query are our own clean catalogue data (not
+  //     scraped/guessed text), so the match is high-confidence — and the
+  //     result is a real, branding-free 30s <audio> preview.
   //  3. A verified identifier (t.spotifyId / t.youtubeId) — used only when
-  //     neither iTunes nor Deezer has a match for that exact title/artist.
-  //     Still guaranteed-correct, but the Spotify hidden-controller path can
-  //     be silent on some mobile browsers, so it's now the fallback rather
+  //     iTunes genuinely has no match for that exact title/artist. Still
+  //     guaranteed-correct, but the Spotify hidden-controller path can be
+  //     silent on some mobile browsers, so it's now the fallback rather
   //     than the first choice.
   //  4. The generated placeholder loop, clearly labelled, as a last resort.
-  if(t.itunesPreviewUrl || t.deezerPreviewUrl){
+  if(t.itunesPreviewUrl){
     stopPlayback();
     state.playingId = id;
     state.playingItunes = true;
     updatePlayerUI();
     const el = ensureItunesAudioEl();
-    el.src = t.itunesPreviewUrl || t.deezerPreviewUrl;
+    el.src = t.itunesPreviewUrl;
     el.play().catch(()=>{});
     return;
   }
-  if(!t.itunesChecked || !t.deezerChecked){
+  if(!t.itunesChecked){
     // Prime the shared <audio> element with this exact tap's user gesture
-    // BEFORE the network lookups below — see ensureItunesAudioEl for why
-    // this is what makes a real preview actually audible on an iPhone, not
-    // just found.
+    // BEFORE the network lookup below — see ensureItunesAudioEl for why
+    // this is what makes the real preview actually audible on an iPhone,
+    // not just found.
     stopPlayback();
     state.playingId = id;
     state.itunesLoading = true;
     updatePlayerUI();
     const el = ensureItunesAudioEl();
     try{ el.src = SILENT_AUDIO_DATA_URI; el.play().catch(()=>{}); }catch(e){ /* priming is best-effort, fire-and-forget: some phones never settle this promise, and awaiting it was blocking ALL playback */ }
-    const [itunesHit, deezerHit] = await Promise.all([
-      t.itunesChecked ? Promise.resolve(itunesCache[t.id] ?? null) : lookupItunesPreview(t),
-      t.deezerChecked ? Promise.resolve(deezerCache[t.id] ?? null) : lookupDeezerPreview(t),
-    ]);
-    // Only lock a source to the generated preview for the rest of the
-    // session once its answer is a confirmed negative (its cache has an
-    // entry for it). A network failure leaves that cache unset on purpose —
-    // t.itunesChecked/t.deezerChecked stay false too, so the next tap gets
-    // a fresh attempt instead of being stuck because of a one-off hiccup.
+    const hit = await lookupItunesPreview(t);
+    // Only lock this track to the generated preview for the rest of the
+    // session once Apple's answer is a confirmed negative (itunesCache has
+    // an entry for it). A network failure leaves itunesCache unset on
+    // purpose — t.itunesChecked stays false too, so the next tap gets a
+    // fresh attempt instead of being stuck because of a one-off hiccup.
     if(itunesCache[t.id] !== undefined) t.itunesChecked = true;
-    if(deezerCache[t.id] !== undefined) t.deezerChecked = true;
     if(state.playingId !== id) return; // listener moved on during the lookup
     state.itunesLoading = false;
-    const hit = itunesHit || deezerHit; // iTunes wins when both found something
     if(hit && hit.previewUrl){
-      if(itunesHit && itunesHit.previewUrl){ t.itunesPreviewUrl = itunesHit.previewUrl; t.itunesTrackUrl = itunesHit.trackViewUrl; }
-      else { t.deezerPreviewUrl = hit.previewUrl; }
+      t.itunesPreviewUrl = hit.previewUrl;
+      t.itunesTrackUrl = hit.trackViewUrl;
       state.playingItunes = true;
       updatePlayerUI();
       el.src = hit.previewUrl;
       el.play().catch(()=>{});
       return;
     }
-    // Neither iTunes nor Deezer: fall through to spotifyId/youtubeId, then
+    // No iTunes match: fall through below to try spotifyId/youtubeId, then
     // the generated loop as a last resort.
   }
   if(t.spotifyId){
-    // Lecture pilotée en coulisses via l'API Spotify (contrôleur caché,
-    // jamais leur lecteur/logo affiché) — notre propre mini-player sert
-    // d'interface. Si l'auto-lecture ne démarre vraiment pas (politique
-    // navigateur sur iPhone notamment), bascule automatiquement sur le
-    // widget Spotify visible classique après un court délai, pour ne
-    // jamais laisser un bouton play qui ne fait rien.
+    // Widget Spotify officiel, affiché tel quel (logo compris) — voir la
+    // note au-dessus de spotifyController pour pourquoi un lecteur caché a
+    // été abandonné.
     stopPlayback();
     state.playingId = id;
-    state.playingEmbed = 'spotify-hidden';
-    state.itunesLoading = true;
+    state.playingEmbed = 'spotify';
     updatePlayerUI();
-    const uri = 'spotify:track:'+t.spotifyId;
-    const controller = await loadSpotifyController(uri);
-    if(state.playingId !== id) return; // l'auditeur est passé à autre chose entretemps
-    if(!controller){
-      state.itunesLoading = false;
-      state.playingEmbed = 'spotify';
-      updatePlayerUI();
-      return;
-    }
-    state.itunesLoading = false;
-    updatePlayerUI();
-    startSpotifyHiddenPlayback(controller, uri, id);
     return;
   }
   if(t.youtubeId){
@@ -2452,22 +2274,6 @@ function renderMiniPlayer(){
   if(!state.playingId) return '';
   const t = TRACKS.find(x=>x.id===state.playingId) || realTracksCache[state.playingId];
   if(!t) return '';
-  if(state.playingEmbed==='spotify-hidden' && t.spotifyId){
-    // Lecture Spotify pilotée en coulisses — jamais de logo/widget Spotify
-    // affiché, barre dans le style maison comme pour Apple Music. Morceau
-    // vérifié (pas deviné), donc pas de badge "extrait démo".
-    const g2 = genreById(t.genre);
-    return `
-    <div class="mini-player mini-player-spotify">
-      <div class="cover" style="width:34px;height:34px;border-radius:9px;font-size:11px;position:relative;overflow:hidden;${coverStyle(t.genre,t.coverSeed)}">${coverInitials(t.title)}${t.coverUrl?`<img src="${t.coverUrl}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:''}</div>
-      <div class="mp-info">
-        <div class="mp-title">${esc(t.title)}</div>
-        <div class="mp-artist">${esc(t.artist)}${t.isRealCity?'':` · <span style="color:${g2.color};">${g2.name}</span>`} · extrait vérifié</div>
-      </div>
-      <button data-action="toggle-play" data-id="${t.id}">⏸</button>
-      <button data-action="mini-player-stop" title="Arrêter">✕</button>
-    </div>`;
-  }
   if(state.playingEmbed==='spotify' && t.spotifyId){
     // Lecteur Spotify vérifié — jamais deviné, toujours le bon morceau. Sur
     // iPhone, le tap de départ ne suffit pas toujours à lancer le son tout
@@ -2554,32 +2360,29 @@ function setQuickGenre(key){
   state.genreFilters = new Set();
   if(key==='all'){ /* empty = all */ }
   else if(key==='melodic'){ state.genreFilters.add('melodic-house'); state.genreFilters.add('melodic-techno'); }
-  else if(key==='techno'){ state.genreFilters.add('techno'); }
   else if(key==='afro-house'){ state.genreFilters.add('afro-house'); }
   else if(key==='afro-tech'){ state.genreFilters.add('afro-tech'); }
-  else if(key==='house'){ state.genreFilters.add('house'); }
   renderView();
 }
 function quickGenreActive(key){
   const s = state.genreFilters;
   if(key==='all') return s.size===0;
   if(key==='melodic') return s.size===2 && s.has('melodic-house') && s.has('melodic-techno');
-  if(key==='techno') return s.size===1 && s.has('techno');
   if(key==='afro-house') return s.size===1 && s.has('afro-house');
   if(key==='afro-tech') return s.size===1 && s.has('afro-tech');
-  if(key==='house') return s.size===1 && s.has('house');
   return false;
 }
-// Which of the 5 quick-chip genres (if any) is the ONLY active filter right
+// Which of the quick-chip genres (if any) is the ONLY active filter right
 // now — these are the ones with a real, synced Beatport genre chart (see
 // genre_chart_entries / activeRealGenreKey below). A broader/combined
 // selection made via "+ de genres" still falls back to the static catalogue.
+// "House" et "Techno" retirés de ce groupe le 2026-10-04 avec le reste du
+// catalogue de ces 2 genres (demande explicite) — plus de chip, plus de
+// chart réel accessible depuis l'app pour ces 2-là.
 function activeRealGenreKey(){
   if(quickGenreActive('afro-house')) return 'afro-house';
   if(quickGenreActive('afro-tech')) return 'afro-tech';
-  if(quickGenreActive('house')) return 'house';
   if(quickGenreActive('melodic')) return 'melodic';
-  if(quickGenreActive('techno')) return 'techno';
   return null;
 }
 
@@ -2663,13 +2466,8 @@ function renderHome(){
     <div class="chiprow">
       <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
       <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
-      <!-- Afro Tech retiré : Beatport n'a pas de chart dédié pour ce genre,
-           donc il affichait toujours exactement les mêmes morceaux que Afro
-           House (voir sync-charts/index.ts, GENRE_CHART_TARGETS) — une
-           catégorie en double plutôt qu'un vrai contenu distinct. -->
-      <div class="chip ${quickGenreActive('house')?'active':''}" data-action="quickgenre" data-g="house">${tr('home.chipHouse')}</div>
+      <div class="chip ${quickGenreActive('afro-tech')?'active':''}" data-action="quickgenre" data-g="afro-tech">${tr('home.chipAfroTech')}</div>
       <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
-      <div class="chip ${quickGenreActive('techno')?'active':''}" data-action="quickgenre" data-g="techno">${tr('home.chipTechno')}</div>
       <div class="chip ghost" data-action="open-genre-sheet">${tr('home.chipMoreGenres')}</div>
     </div>` : `
     <div style="font-size:10.5px;color:var(--text-muted);margin-top:9px;line-height:1.4;">Filtre par genre indisponible ici : Soundcharts ne fournit pas le genre réel de chaque morceau pour les classements ville.</div>`}
@@ -2801,7 +2599,6 @@ function renderNextBig(){
       <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
       <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
       <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
-      <div class="chip ${quickGenreActive('techno')?'active':''}" data-action="quickgenre" data-g="techno">${tr('home.chipTechno')}</div>
     </div>
   </div>
   <div class="hpad" style="display:flex;flex-direction:column;gap:12px;margin-top:8px;">
@@ -2984,7 +2781,7 @@ function renderRadarSaved(favTracks){
   ${state.favGenres.size || state.favCities.size ? `
   <div class="divider"></div>
   <div class="hpad">
-    ${state.favGenres.size? `<div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">${tr('radar.followedGenres')}</div><div class="chiprow" style="padding:0 0 10px;">${[...state.favGenres].map(g=>`<div class="chip active">${genreById(g).name}</div>`).join('')}</div>`:''}
+    ${state.favGenres.size? `<div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">${tr('radar.followedGenres')}</div><div class="chiprow" style="padding:0 0 10px;">${[...state.favGenres].map(g=>`<div class="chip active">${genreById(g)?.name || g}</div>`).join('')}</div>`:''}
     ${state.favCities.size? `<div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">${tr('radar.followedCities')}</div><div class="chiprow" style="padding:0;">${[...state.favCities].map(c=>`<div class="chip active">${cityById(c).name}</div>`).join('')}</div>`:''}
   </div>` : ''}
   `;
@@ -3054,7 +2851,7 @@ function renderProfile(){
         <div style="margin-top:5px;">${u.isPro? `<span class="status-chip good"><span class="sw"></span>${tr('profile.proDj')}</span>` : `<span class="status-chip warning"><span class="sw"></span>${tr('profile.free')}</span>`}</div>
       </div>
     </div>
-    <div class="chiprow" style="padding:12px 0 0;">${u.genres.map(g=>`<div class="chip active">${genreById(g).name}</div>`).join('')}</div>
+    <div class="chiprow" style="padding:12px 0 0;">${u.genres.map(g=>`<div class="chip active">${genreById(g)?.name || g}</div>`).join('')}</div>
     <div style="display:flex;gap:8px;margin-top:12px;">
       ${u.instagram? `<div class="platform-btn">📷 ${esc(u.instagram)}</div>`:''}
       ${u.soundcloud? `<div class="platform-btn">☁️ SoundCloud</div>`:''}
@@ -3677,6 +3474,7 @@ initPersistence().then(()=>{
   if(state.user){ enterApp(); }
 });
 initNativeShell();
+
 </script>
 </body>
 </html>
