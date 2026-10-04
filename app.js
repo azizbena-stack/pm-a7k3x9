@@ -1990,7 +1990,33 @@ function noPreviewHTML(){
       <a style="${b}" href="https://open.spotify.com/search/${q}" target="_blank" rel="noopener">Spotify</a>
       <a style="${b}" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">YouTube</a>
       <a style="${b}" href="https://music.apple.com/search?term=${q}" target="_blank" rel="noopener">Apple Music</a>
+      <a style="${b}" href="https://www.beatport.com/search?q=${q}" target="_blank" rel="noopener">Beatport</a>
     </div></div>`;
+}
+/* ---------------------------- SOURCE DE LECTURE (PRO) ----------------------------
+   Gratuit : extrait Apple Music de 30 s dans l'app. PRO : choix Apple Music / Spotify / YouTube.
+   Spotify et YouTube se lisent dans l'app quand l'identifiant du morceau est connu, sinon la recherche s'ouvre sur le service. */
+const PLAY_SOURCE_KEY = 'pulse_play_source';
+function getPlaySource(){
+  if(!isPro()) return 'apple';
+  try{ const v = localStorage.getItem(PLAY_SOURCE_KEY); if(v==='spotify'||v==='youtube'||v==='apple') return v; }catch(e){}
+  return 'apple';
+}
+function externalSearchUrl(p, t){
+  const q = encodeURIComponent(platformQuery(t));
+  return ({
+    Spotify: 'https://open.spotify.com/search/'+q,
+    YouTube: 'https://www.youtube.com/results?search_query='+q,
+    AppleMusic: 'https://music.apple.com/search?term='+q,
+    Beatport: 'https://www.beatport.com/search?q='+q,
+    SoundCloud: 'https://soundcloud.com/search?q='+q,
+  })[p];
+}
+function playSourceHTML(){
+  const cur = getPlaySource();
+  const opts = [['apple','Apple Music'],['spotify','Spotify'],['youtube','YouTube']];
+  return `<div class="hpad"><div style="font-size:10.5px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">SOURCE DE LECTURE ${isPro()?'':'🔒 PRO'}</div>
+    <div class="chiprow" style="padding:0;">${opts.map(([k,l])=>`<div class="chip ${cur===k?'active':''}" data-action="set-play-source" data-s="${k}">${l}</div>`).join('')}</div></div>`;
 }
 /* Pochettes manquantes (la synchro n'en a qu'une partie) : complétées via l'artwork Apple dès que la ligne devient visible. */
 const coverQueue = []; let coverBusy = false;
@@ -2028,6 +2054,15 @@ async function togglePlay(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
   state.noPreview = null;
+  const src = getPlaySource();
+  if(src==='spotify'){
+    if(t.spotifyId){ stopPlayback(); state.playingId = id; state.playingEmbed = 'spotify'; updatePlayerUI(); return; }
+    window.open(externalSearchUrl('Spotify', t), '_blank', 'noopener'); return;
+  }
+  if(src==='youtube'){
+    if(t.youtubeId){ stopPlayback(); state.playingId = id; state.playingEmbed = 'youtube'; updatePlayerUI(); return; }
+    window.open(externalSearchUrl('YouTube', t), '_blank', 'noopener'); return;
+  }
   if(state.playingId===id){ stopPlayback(); return; }
   // Priority order (revised: a confirmed mobile test showed the hidden
   // Spotify controller can report "playing" while staying silent — a
@@ -2836,6 +2871,8 @@ function renderProfile(){
 
   <div class="section-title"><h2>${tr('profile.language')}</h2></div>
   <div class="hpad">${langSwitcherHTML(state.lang)}</div>
+  <div style="height:12px;"></div>
+  ${playSourceHTML()}
 
   <div class="divider"></div>
   <div class="hpad" style="display:flex;flex-direction:column;gap:9px;">
@@ -2966,7 +3003,10 @@ function renderTrackOverlay(){
         <div class="platform-btn" data-action="platform" data-p="Spotify" data-id="${t.id}">🟢 ${tr('track.spotify')}</div>
         <div class="platform-btn" data-action="platform" data-p="SoundCloud" data-id="${t.id}">☁️ ${tr('track.soundcloud')}</div>
         <div class="platform-btn" data-action="platform" data-p="AppleMusic" data-id="${t.id}">🍎 ${tr('track.appleMusic')}</div>
+        <div class="platform-btn" data-action="platform" data-p="YouTube" data-id="${t.id}">▶️ YouTube</div>
+        <div class="platform-btn" data-action="platform" data-p="Beatport" data-id="${t.id}">🟠 ${tr('track.beatport')}</div>
       </div>
+      ${playSourceHTML()}
       <div style="height:20px;"></div>
     </div>
   `;
@@ -3346,22 +3386,22 @@ document.addEventListener('click', async (e)=>{
     renderTrackOverlay();
   }
   else if(a==='platform'){
-    const t2 = el.dataset.id ? TRACKS.find(x=>x.id===el.dataset.id) : null;
+    const t2 = el.dataset.id ? (TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]) : null;
     const p = el.dataset.p;
     if(p==='Spotify' && t2 && t2.spotifyId){ window.open('https://open.spotify.com/track/'+t2.spotifyId, '_blank', 'noopener'); }
     else if(t2){
       // No verified per-track ID on this platform — open a real search on the platform
       // for this exact title + artist, rather than a fake/unverifiable embed.
-      const q = encodeURIComponent(platformQuery(t2));
-      const urls = {
-        Spotify: 'https://open.spotify.com/search/'+q,
-        SoundCloud: 'https://soundcloud.com/search?q='+q,
-        AppleMusic: 'https://music.apple.com/search?term='+q,
-      };
-      if(urls[p]) window.open(urls[p], '_blank', 'noopener');
+      const u = externalSearchUrl(p, t2);
+      if(u) window.open(u, '_blank', 'noopener');
       else toast(tf('toast.openingOn',{p}));
     }
     else toast(tf('toast.openingOn',{p}));
+  }
+  else if(a==='set-play-source'){
+    if(!isPro()){ openPaywall(); return; }
+    try{ localStorage.setItem(PLAY_SOURCE_KEY, el.dataset.s); }catch(e){}
+    if(!document.getElementById('trackOverlay').classList.contains('hidden')) renderTrackOverlay(); else renderView();
   }
   else if(a==='toggle-play'){ togglePlay(el.dataset.id); }
   else if(a==='close-nopreview'){ state.noPreview = null; updatePlayerUI(); }
