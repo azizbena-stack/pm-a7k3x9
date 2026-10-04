@@ -1548,8 +1548,8 @@ function coverStyle(genreId, seed){
 function coverInitials(title){
   return title.replace(/\(.*?\)/g,'').trim().split(' ').filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
 }
-// Pochettes Deezer (conditions non commerciales) et Soundcharts (accès refusé, 403) exclues ; les pochettes Beatport du catalogue fixe sont rétablies ; le reste vient d'Apple (voir pumpCoverQueue) ; : on utilise l'artwork Apple à la place (voir pumpCoverQueue).
-function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com|soundcharts\.com/i.test(u)) ? u : null; }
+// Pochettes Deezer (conditions non commerciales) exclues ; images Soundcharts (licence) autorisées ; les pochettes Beatport du catalogue fixe sont rétablies ; le reste vient d'Apple (voir pumpCoverQueue) ; : on utilise l'artwork Apple à la place (voir pumpCoverQueue).
+function safeCover(u){ return (u && !/dzcdn\.net|deezer\.com/i.test(u)) ? u : null; }
 function coverHTML(t, big){
   const playing = state.playingId===t.id;
   // Real Beatport cover art is hotlinked from Beatport's own public CDN (the same
@@ -2051,6 +2051,7 @@ function externalSearchUrl(p, t){
     SoundCloud: 'https://soundcloud.com/search?q='+q,
   })[p];
 }
+const lockedChoice = (label)=>`<button class="btn btn-outline btn-block" style="text-align:left;display:block;opacity:.8;" data-action="open-paywall">${label} 🔒 PRO<div style="font-size:10.5px;font-weight:600;color:var(--text-muted);margin-top:2px;">Réservé à la version PRO</div></button>`;
 function openPlayChoice(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
@@ -2064,10 +2065,10 @@ function openPlayChoice(id){
         <div style="font-size:11.5px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.artist||'')}</div></div>
       <button class="close-btn" data-action="close-play-choice">✕</button></div>
     <div style="display:flex;flex-direction:column;gap:9px;">
-      ${b('apple','🍎 Apple Music', "Extrait de 30 s directement dans l'app")}
-      ${b('spotify','🟢 Spotify', t.spotifyId ? "Lecteur Spotify dans l'app" : 'Ouvre la recherche Spotify')}
       ${b('youtube','▶️ YouTube', t.youtubeId ? "Lecteur YouTube dans l'app" : 'Ouvre la recherche YouTube')}
-      ${isPro() ? b('beatport','🟠 Beatport','Ouvrir le morceau sur Beatport') : `<button class="btn btn-outline btn-block" style="text-align:left;display:block;opacity:.8;" data-action="open-paywall">🟠 Beatport 🔒 PRO<div style="font-size:10.5px;font-weight:600;color:var(--text-muted);margin-top:2px;">Réservé à la version PRO</div></button>`}
+      ${isPro() ? b('apple','🍎 Apple Music', "Extrait de 30 s directement dans l'app") : lockedChoice('🍎 Apple Music')}
+      ${isPro() ? b('spotify','🟢 Spotify', t.spotifyId ? "Lecteur Spotify dans l'app" : 'Ouvre la recherche Spotify') : lockedChoice('🟢 Spotify')}
+      ${isPro() ? b('beatport','🟠 Beatport','Ouvrir le morceau sur Beatport') : lockedChoice('🟠 Beatport')}
     </div></div>`;
 }
 function playSourceHTML(){
@@ -3460,6 +3461,7 @@ document.addEventListener('click', async (e)=>{
   else if(a==='play-with'){
     document.getElementById('playChoice').classList.add('hidden');
     if(el.dataset.s==='beatport'){ const tt = TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]; if(tt) window.open(externalSearchUrl('Beatport', tt), '_blank', 'noopener'); }
+    else if(!isPro() && el.dataset.s!=='youtube') openPaywall();
     else togglePlay(el.dataset.id, el.dataset.s);
   }
   else if(a==='close-play-choice'){ document.getElementById('playChoice').classList.add('hidden'); }
