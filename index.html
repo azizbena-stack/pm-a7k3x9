@@ -2575,7 +2575,7 @@ function renderView(){
   if(state.view==='home' && !featuredLoaded){ featuredLoaded = true; loadFeaturedPicks(); }
   document.querySelectorAll('.nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.view===state.view));
   const c = document.getElementById('view-container');
-  if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else loadHomeGenreChartList(); }
+  if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else if(state.scope==='country') loadHomeCountryList(); else loadHomeGenreChartList(); }
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
   else if(state.view==='radar') c.innerHTML = renderRadar();
@@ -2685,7 +2685,11 @@ function renderHome(){
     <div class="empty-msg">Chargement…</div>
   </div>
   <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
-  ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : realGenreKey ? `
+  ${!isPro() ? `<div class="hpad" style="margin-top:6px;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>` : ''}` : state.scope==='country' ? `
+  <div class="track-list" id="homeCountryList">
+    <div class="empty-msg">Chargement…</div>
+  </div>
+  <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>` : realGenreKey ? `
   <div class="track-list" id="homeGenreChartList">
     <div class="empty-msg">Chargement…</div>
   </div>
@@ -2706,7 +2710,83 @@ async function loadHomeCityList(){
   const entries = await fetchRealCityChart(appCityId, platform, period);
   if(cityViewId()!==appCityId || state.homeCityPlatform!==platform || state.period!==period) return; // user moved on
   const host = document.getElementById('homeCityList');
-  if(host) host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS });
+  if(!host) return;
+  // Musique électronique uniquement : on garde les morceaux du classement ville qui figurent dans nos classements électro
+  // (genres Beatport + classement électro du pays) ; s'il y en a trop peu, on affiche le classement électro du pays.
+  const cc = (cityById(appCityId)||{}).country;
+  const [uni, cEntries] = await Promise.all([loadElectronicUniverse(), fetchCountryElectronic(cc)]);
+  if(cityViewId()!==appCityId) return;
+  const electro = entries.filter(e=>e.tracks && isElectronicEntry(uni, e.tracks));
+  let shown = [], note = '';
+  if(electro.length>=5){ shown = electro.map((e,i)=>({...e, rank:i+1, previous_rank:null})); note = 'Uniquement les morceaux électro du classement de la ville.'; }
+  else if(cEntries.length){ shown = cEntries; note = 'Pas assez de morceaux électro dans le classement de cette ville : voici le classement électro du pays.'; }
+  if(!shown.length){
+    // Pas encore de données électro pour ce pays : sélection électro de démonstration, classée par affinité avec la ville.
+    const demo = TRACKS.filter(trackMatchesGenreFilter).slice().sort((a,b)=>(b.cityAffinity[appCityId]||0)-(a.cityAffinity[appCityId]||0));
+    host.innerHTML = `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">Classement électro réel de cette ville bientôt disponible : sélection électro de démonstration.</div>`
+      + demo.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)).join('');
+    return;
+  }
+  host.innerHTML = (note ? `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">${note}</div>` : '')
+    + realChartListHTML(shown, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS });
+}
+
+/* ---------------------------- ÉLECTRO PAR PAYS ----------------------------
+   Classement électro (Dance/Electronic) Apple Music ou Shazam de chaque pays, synchronisé par la fonction Supabase
+   (table country_electronic_entries). La vue Pays n'affiche plus que de la musique électronique. */
+const countryElectroCache = {};
+async function fetchCountryElectronic(cc){
+  if(!cc) return [];
+  if(countryElectroCache[cc]) return countryElectroCache[cc];
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/country_electronic_entries?country_code=eq.${cc}&select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=100`, { headers: SUPABASE_HEADERS });
+    const rows = await res.json();
+    const entries = (Array.isArray(rows)?rows:[]).map(r=>({ rank:r.rank, previous_rank:r.previous_rank, tracks:{ title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null } }));
+    if(entries.length) countryElectroCache[cc] = entries;
+    return entries;
+  }catch(e){ return []; }
+}
+function coreTitle(s){
+  return normText(String(s||'').replace(/\s*[\(\[][^\)\]]*[\)\]]/g,'').replace(/\s*-\s*(extended|radio|original|club|vip|remix|edit|mix)\b.*$/i,'')).trim();
+}
+let electronicUniversePromise = null;
+function loadElectronicUniverse(){
+  if(electronicUniversePromise) return electronicUniversePromise;
+  electronicUniversePromise = (async()=>{
+    const map = new Map();
+    const add = (t,a)=>{ const k = coreTitle(t); if(!k) return; const arr = map.get(k) || []; arr.push(normText(a)); map.set(k,arr); };
+    for(const table of ['genre_chart_entries','country_electronic_entries']){
+      for(let off=0; off<6000; off+=1000){
+        try{
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=title,artist_name&order=id.asc&limit=1000&offset=${off}`, { headers: SUPABASE_HEADERS });
+          const rows = await res.json();
+          if(!Array.isArray(rows) || !rows.length) break;
+          rows.forEach(r=>add(r.title, r.artist_name));
+          if(rows.length<1000) break;
+        }catch(e){ break; }
+      }
+    }
+    return map;
+  })();
+  return electronicUniversePromise;
+}
+function isElectronicEntry(map, t){
+  const arr = map.get(coreTitle(t.title));
+  if(!arr) return false;
+  const words = sigWords(t.artist_name||'', 2);
+  return words.length===0 || arr.some(a=>words.some(w=>a.includes(w)));
+}
+async function loadHomeCountryList(){
+  const cc = state.selectedCountry;
+  if(state.scope!=='country' || cityViewId()) return;
+  const entries = await fetchCountryElectronic(cc);
+  if(state.scope!=='country' || state.selectedCountry!==cc || cityViewId()) return; // user moved on
+  const host = document.getElementById('homeCountryList');
+  if(!host) return;
+  if(entries.length){ host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS }); return; }
+  const list = scopedList();
+  host.innerHTML = `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">Classement électro de ce pays bientôt disponible : sélection électro de démonstration.</div>`
+    + list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)).join('');
 }
 
 // Real per-genre Top 100 (Monde/Pays), synced daily from Beatport's own
