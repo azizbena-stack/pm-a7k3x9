@@ -470,7 +470,7 @@ const APP_CITY_TO_DB_NAME = {
 // alimenter le sélecteur "Ville" et l'onglet "Ville" d'Explore : les
 // nouvelles villes ajoutées pour les pays supplémentaires n'ont pas de vrai
 // classement et ne doivent jamais y apparaître.
-const REAL_CITIES = CITIES.filter(c => !!APP_CITY_TO_DB_NAME[c.id]);
+const REAL_CITIES = CITIES.filter(c => !!APP_CITY_TO_DB_NAME[c.id] && c.id!=='ibiza') // Ibiza = mêmes morceaux que l'Espagne;
 const PLATFORM_LABEL = { apple_music:'Apple Music', spotify:'Spotify', shazam:'Shazam' };
 const PLATFORMS_UI = ['apple_music', 'spotify', 'shazam'];
 
@@ -612,7 +612,7 @@ function renderRealTrackRow(entry, idx, locked){
     // generated-loop pipeline instead (see togglePlay) — exactly like the
     // Monde/Pays rows — because a YouTube iframe's autoplay cannot reliably
     // follow this tap's gesture on mobile Safari.
-    youtubeId: t.youtube_id || null,
+    youtubeId: t.youtube_id || ytLookup(t.title, t.artist_name),
   };
   const t2 = realTracksCache[rid]; // normalized object (coverHTML/genreById expect this shape, same as Monde/Pays rows)
   return `
@@ -854,6 +854,8 @@ buildTracks();
 // sync-charts' catalog backfill) applied here once it's available — the
 // catalogue itself is built synchronously above, so this patches it in
 // shortly after and re-renders if a track detail/list is already on screen.
+let YT_MAP = {};
+const ytLookup = (title, artist) => YT_MAP[coreTitle(title)+'|'+normText(artist)] || null;
 async function applyCatalogYoutubeIds(){
   // yt_map.json : vidéo YouTube vérifiée (titre + artiste) pour chaque morceau du catalogue. L'ancienne table
   // catalog_youtube était indexée par numéro de morceau et ne correspondait plus : elle ouvrait d'autres morceaux.
@@ -861,6 +863,7 @@ async function applyCatalogYoutubeIds(){
     const res = await fetch('yt_map.json');
     if(!res.ok) return;
     const m = await res.json();
+    YT_MAP = m;
     let changed = false;
     TRACKS.forEach(t=>{
       const id = m[coreTitle(t.title)+'|'+normText(t.artist)];
@@ -2466,6 +2469,7 @@ async function togglePlay(id, forcedSource){
     window.open(externalSearchUrl('Spotify', t), '_blank', 'noopener'); return;
   }
   if(src==='youtube'){
+    if(!t.youtubeId) t.youtubeId = ytLookup(t.title, t.artist);
     if(t.youtubeId){ stopPlayback(); state.playingId = id; state.playingEmbed = 'youtube'; updatePlayerUI(); return; }
     window.open(externalSearchUrl('YouTube', t), '_blank', 'noopener'); return;
   }
@@ -2695,7 +2699,7 @@ function activeRealGenreKey(){
    RENDER: ROOT DISPATCH
    ============================================================================ */
 // Pays : une ville de ce pays (avec vrai classement Soundcharts) peut être choisie ; '' = tout le pays.
-function countryRealCities(){ return REAL_CITIES.filter(c=>c.country===state.selectedCountry); }
+function countryRealCities(){ return REAL_CITIES.filter(c=>c.country===state.selectedCountry).slice(0,1); } // une seule ville par pays
 function cityViewId(){ return state.scope==='country' && state.countryCity && countryRealCities().some(c=>c.id===state.countryCity) ? state.countryCity : null; }
 function renderView(){
   if(state.view==='home' && !featuredLoaded){ featuredLoaded = true; loadFeaturedPicks(); }
