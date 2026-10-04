@@ -320,13 +320,13 @@ function realChartPlatformTabsHTML(action, selected){
     ${PLATFORMS_UI.map(p=>`<button class="${p===selected?'active':''}" data-action="${action}" data-p="${p}">${PLATFORM_LABEL[p]}</button>`).join('')}
   </div>`;
 }
-// Bouton PRO placé juste là où le flou commence (pas besoin de descendre en bas) : lignes gratuites, bouton, puis quelques lignes floutées.
+// Bouton PRO placé juste là où le flou commence (pas besoin de descendre en bas) : lignes gratuites, bouton, puis toutes les lignes floutées jusqu'au 100e.
 function lockBannerHTML(){
   return `<div class="hpad" style="margin:10px 0;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>`;
 }
 function withLockBanner(rows, freeLimit){
   if(isPro() || freeLimit==null || rows.length<=freeLimit) return rows.join('');
-  return rows.slice(0,freeLimit).join('') + lockBannerHTML() + rows.slice(freeLimit, freeLimit+5).join('');
+  return rows.slice(0,freeLimit).join('') + lockBannerHTML() + rows.slice(freeLimit).join('');
 }
 function realChartListHTML(entries, opts){
   opts = opts || {};
@@ -2119,7 +2119,24 @@ async function pumpCoverQueue(){
   }
   coverBusy = false;
 }
+// Applique tout de suite les pochettes déjà préparées (covers.json) aux lignes affichées : aucun défilement ni requête nécessaire.
+function applyStoredCovers(){
+  document.querySelectorAll('[data-lazycover]').forEach(el=>{
+    if(el.querySelector('img')) return;
+    const t = realTracksCache[el.dataset.lazycover] || TRACKS.find(x=>x.id===el.dataset.lazycover);
+    if(!t) return;
+    const sh = itStoreGet(t);
+    if(!sh || !sh.artwork) return;
+    t.coverUrl = sh.artwork;
+    const img = new Image(); img.alt=''; img.referrerPolicy='no-referrer';
+    img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;';
+    img.onload = ()=>{ if(el.isConnected && !el.querySelector('img')) el.insertBefore(img, el.firstChild); };
+    img.src = sh.artwork;
+  });
+}
+coversReady.then(applyStoredCovers);
 function scanLazyCovers(){
+  applyStoredCovers();
   if(!coverObserver) return;
   document.querySelectorAll('[data-lazycover]:not([data-cv])').forEach(el=>{ el.dataset.cv='1'; coverObserver.observe(el); });
 }
