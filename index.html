@@ -289,6 +289,7 @@ button{font-family:inherit;}
       <button class="nav-btn" data-action="nav" data-view="home"><span class="ic">🏆</span><span data-i18n="nav.top">Top</span></button>
       <button class="nav-btn" data-action="nav" data-view="nextbig"><span class="ic">🚀</span><span data-i18n="nav.nextbig">Next Big</span></button>
       <button class="nav-btn" data-action="nav" data-view="explore"><span class="ic">🌍</span><span data-i18n="nav.explore">Explore</span></button>
+      <button class="nav-btn" data-action="nav" data-view="playlists"><span class="ic">🎵</span><span>Playlists</span></button>
       <button class="nav-btn" data-action="nav" data-view="radar"><span class="ic">📡</span><span data-i18n="nav.radar">Radar</span></button>
       <button class="nav-btn" data-action="nav" data-view="profile"><span class="ic">👤</span><span data-i18n="nav.profile">Profil</span></button>
     </nav>
@@ -598,7 +599,7 @@ const favMap = lsObj('pm_fav'), seenMap = lsObj('pm_seen');
 function lsSave(){ try{ localStorage.setItem('pm_fav',JSON.stringify(favMap)); localStorage.setItem('pm_seen',JSON.stringify(seenMap)); }catch(e){} }
 function trackMarksHTML(t){
   const k = itKey(t);
-  return `<span class="mk heart${favMap[k]?' on':''}" data-action="toggle-heart" data-id="${t.id}">${favMap[k]?'♥':'♡'}</span><span class="mk seen${seenMap[k]?' on':''}" data-k="${esc(k)}">✓</span>`;
+  return `<span class="mk" data-action="add-pl" data-id="${t.id}">＋</span><span class="mk heart${favMap[k]?' on':''}" data-action="toggle-heart" data-id="${t.id}">${favMap[k]?'♥':'♡'}</span><span class="mk seen${seenMap[k]?' on':''}" data-k="${esc(k)}">✓</span>`;
 }
 function markSeen(t){
   const k = itKey(t); if(seenMap[k]) return;
@@ -643,6 +644,32 @@ function openSearch(){
   ov.innerHTML = `<div class="overlay-header"><input id="searchInp" type="search" placeholder="🔍 Artiste ou musique" oninput="renderSearch()" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;margin-right:8px;"><button class="icon-btn" data-action="search-fav" id="searchFavBtn">♡ Favoris</button><button class="icon-btn" data-action="close-search">✕</button></div><div id="searchRes" style="overflow-y:auto;flex:1;padding-bottom:90px;"></div>`;
   searchFav = false; ov.classList.remove('hidden'); renderSearch();
   document.getElementById('searchInp').focus();
+}
+/* ---------------------------- PLAYLISTS ---------------------------- */
+let plMap = lsObj('pm_pl'), plOpen = null;
+function plSave(){ try{ localStorage.setItem('pm_pl',JSON.stringify(plMap)); }catch(e){} }
+function renderPlaylists(){
+  const head = `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Playlists</div></div></div>`;
+  if(plOpen && plMap[plOpen]){
+    const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div><span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
+    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
+  }
+  const names = Object.keys(plMap);
+  return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><input id="plName" placeholder="Nom de la playlist" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"><button class="btn btn-primary" data-action="pl-create">Créer</button></div>`
+    + (names.length ? names.map(n=>`<div class="track-row" data-action="pl-open" data-n="${esc(n)}"><div class="t-info"><div class="t-title">🎵 ${esc(n)}</div><div class="t-sub">${plMap[n].length} morceau(x)</div></div></div>`).join('') : '<div class="empty-msg">Aucune playlist. Créez-en une, puis ajoutez des morceaux avec ＋.</div>');
+}
+function openAddPl(id){
+  const names = Object.keys(plMap);
+  const ov = document.getElementById('playChoice');
+  ov.innerHTML = `<div class="sheet-inner"><h3 style="margin:0 0 10px;">Ajouter à une playlist</h3>${names.map(n=>`<button class="btn btn-block" style="margin-bottom:8px;" data-action="pl-add" data-n="${esc(n)}" data-id="${id}">${esc(n)}</button>`).join('')}<div style="display:flex;gap:8px;"><input id="plNew" placeholder="Nouvelle playlist" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"><button class="btn btn-primary" data-action="pl-add" data-n="" data-id="${id}">Créer</button></div><button class="btn btn-block" style="margin-top:10px;" data-action="close-play-choice">Fermer</button></div>`;
+  ov.classList.remove('hidden');
+}
+function addToPl(id, name){
+  name = (name || (document.getElementById('plNew')||{}).value || '').trim(); if(!name) return;
+  const t = TRACKS.find(x=>x.id===id) || realTracksCache[id]; if(!t) return;
+  const l = plMap[name] = plMap[name] || [], k = itKey(t);
+  if(!l.some(f=>itKey({title:f.title, artist:f.artist})===k)) l.push({title:t.title, artist:t.artist});
+  plSave(); document.getElementById('playChoice').classList.add('hidden'); toast('Ajouté à « '+name+' »');
 }
 function renderRealTrackRow(entry, idx, locked){
   const t = entry.tracks || {};
@@ -2765,6 +2792,7 @@ function renderView(){
   if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else if(state.scope==='country') loadHomeCountryList(); else loadHomeGenreChartList(); }
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
+  else if(state.view==='playlists') c.innerHTML = renderPlaylists();
   else if(state.view==='radar') c.innerHTML = renderRadar();
   else if(state.view==='profile') c.innerHTML = renderProfile();
   c.scrollTop = 0;
@@ -2856,7 +2884,7 @@ function renderHome(){
   </div>
   <div class="hscroll">
     ${trending.map((t,i)=>`
-      <div class="next-card ${!isPro()&&i>=10?'lock-row':''}" style="flex:0 0 168px;" ${!isPro()&&i>=10?'':`data-action="open-track" data-id="${t.id}"`}>
+      ${!isPro()&&i===10?'<div class="next-card" style="flex:0 0 168px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;" data-action="open-paywall">🔓 Débloquer PRO</div>':''}<div class="next-card ${!isPro()&&i>=10?'lock-row':''}" style="flex:0 0 168px;" ${!isPro()&&i>=10?'':`data-action="open-track" data-id="${t.id}"`}>
         <div class="glow"></div>
         ${coverHTML(t,false)}
         <div style="font-weight:700;font-size:12.5px;margin-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.title)}</div>
@@ -3842,6 +3870,13 @@ document.addEventListener('click', async (e)=>{
   }
   else if(a==='set-trending-period'){ state.trendingPeriod = el.dataset.p; renderView(); }
   else if(a==='open-track'){ openTrack(el.dataset.id); }
+  else if(a==='pl-create'){ const n=(document.getElementById('plName').value||'').trim(); if(n){ plMap[n]=plMap[n]||[]; plSave(); renderView(); } }
+  else if(a==='pl-open'){ plOpen=el.dataset.n; renderView(); }
+  else if(a==='pl-back'){ plOpen=null; renderView(); }
+  else if(a==='pl-del'){ delete plMap[plOpen]; plOpen=null; plSave(); renderView(); }
+  else if(a==='pl-rm'){ plMap[plOpen].splice(+el.dataset.i,1); plSave(); renderView(); }
+  else if(a==='add-pl'){ openAddPl(el.dataset.id); }
+  else if(a==='pl-add'){ addToPl(el.dataset.id, el.dataset.n); }
   else if(a==='toggle-heart'){ toggleHeart(el.dataset.id); }
   else if(a==='open-search'){ openSearch(); }
   else if(a==='close-search'){ document.getElementById('searchOv').classList.add('hidden'); }
