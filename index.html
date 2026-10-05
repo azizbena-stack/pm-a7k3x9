@@ -3293,7 +3293,7 @@ function renderRadar(){
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('radar.title')}</div></div>
-    <div class="radar-tabs">${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}</div>
+    <div class="radar-tabs">${tab('saved','♥ Suivis ('+n+')')}${tab('country','🌍 Pays / Ville')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}</div>
   </div>
   ${t==='search' ? `<div class="hpad" style="margin:8px 0;"><input id="radarInp" type="search" placeholder="Artiste ou morceau : où est-il classé ?" oninput="renderRadarSearch()" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"></div>` : ''}
   <div id="radarBody"><div class="empty-msg">Chargement…</div></div>
@@ -3303,9 +3303,11 @@ async function loadRadar(){
   if(state.radarArtist){ loadArtistStats(); return; }
   const t = state.radarTab;
   if(t==='search'){ renderRadarSearch(); return; }
-  const rows = await loadRadarRows(), host = document.getElementById('radarBody');
-  if(!host || state.view!=='radar' || state.radarTab!==t) return;
-  host.innerHTML = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
+  const rows = await loadRadarRows();
+  const html = t==='alerts' ? radarAlertsHTML(rows) : t==='country' ? await radarCountryHTML(rows) : radarSavedHTML(rows);
+  const host = document.getElementById('radarBody');
+  if(!host || state.view!=='radar' || state.radarTab!==t || state.radarArtist) return;
+  host.innerHTML = html;
 }
 /* ---------------------------- STATISTIQUES ARTISTE (gratuit) ----------------------------
    Présence dans nos classements (genres + pays, positions, mouvements) + catalogue public Apple Music
@@ -3386,7 +3388,7 @@ async function loadArtistStats(){
     const wk = cur && lst.find(x=>(Date.parse(cur.date)-Date.parse(x.date))>=7*86400000), cp = (sd.streaming.items[0].cityPlots||[]);
     real = {}; cp.forEach(c=>{ const o = real[c.countryCode] = real[c.countryCode] || {n:0, name:c.countryName, cities:[]}; o.n += c.value; o.cities.push(c.cityName); });
     Object.values(real).forEach(o=>{ o.top = o.cities.slice(0,3).join(', '); });
-    out += h('🎧 Écoutes Spotify') + tiles([cur ? statTile(fmtNum(cur.value),'auditeurs mensuels', wk ? cur.value-wk.value : 0, lst.slice(0,30).map(x=>x.value).reverse()) : '', statTile(Object.keys(real).length,'pays (top villes)'), statTile(cp.length,'villes')])
+    out += h('🎧 Audience') + '<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;"><span class="chip active">🟢 Spotify</span><span style="font-size:10.5px;color:var(--text-muted);align-self:center;">Apple Music ne publie pas ses audiences</span></div>' + tiles([cur ? statTile(fmtNum(cur.value),'auditeurs mensuels', wk ? cur.value-wk.value : 0, lst.slice(0,30).map(x=>x.value).reverse()) : '', statTile(Object.keys(real).length,'pays (top villes)'), statTile(cp.length,'villes')])
       + `<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:6px;">Données Soundcharts pour « ${esc(sd.artist.name)} ». Vérifiez que c'est bien le bon artiste.</div>`
       + h('🏙️ Top villes') + cp.slice(0,10).map(c=>`<div class="alert-item"><div class="aic">${flagOf(c.countryCode)}</div><div><div class="at">${esc(c.cityName)}</div><div class="ad">${esc(c.countryName)} · ${fmtNum(c.value)} auditeurs</div></div></div>`).join('');
   }
@@ -3408,6 +3410,29 @@ async function loadArtistStats(){
   host.innerHTML = out;
 }
 
+// Onglet « Par pays / ville » : artistes du classement électro d'un pays (ou de sa ville si on en a une), touchez-en un pour ses statistiques.
+function radarArtistList(items){
+  const by = new Map();
+  items.forEach(r=>{
+    const n = r.artist.split(/\s*(?:,|&|feat\.?)\s*/i)[0].trim(); if(!n) return;
+    const o = by.get(n) || {n, t:new Set(), best:999, up:0}; o.t.add(r.ct); o.best = Math.min(o.best, r.rank); if(r.prev!=null && r.prev>r.rank) o.up++; by.set(n,o);
+  });
+  const list = [...by.values()].sort((a,b)=>a.best-b.best).slice(0,40);
+  return list.length ? list.map(o=>`<div class="alert-item" data-action="artist-stats" data-n="${esc(o.n)}" style="cursor:pointer;"><div class="aic">#${o.best}</div><div><div class="at">${esc(o.n)}</div><div class="ad">${o.t.size} titre(s)${o.up ? ' · ▲ '+o.up : ''} · 📊 Statistiques</div></div></div>`).join('') : '<div class="empty-msg">Pas encore de classement électro ici.</div>';
+}
+async function radarCountryHTML(rows){
+  const cc = state.radarCountry || 'FR', cities = REAL_CITIES.filter(c=>c.country===cc), city = cities.find(c=>c.id===state.radarCity);
+  const sel = 'style="width:100%;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:9px 11px;border-radius:12px;font-size:13px;font-weight:700;margin-bottom:8px;"';
+  const head = `<div class="hpad" style="margin:8px 0;"><select data-action="radar-country" ${sel}>${COUNTRIES.map(c=>`<option value="${c.code}" ${c.code===cc?'selected':''}>${c.flag} ${esc(cname(c.code))}</option>`).join('')}</select>`
+    + (cities.length ? `<select data-action="radar-city" ${sel}><option value="">🌍 Tout le pays</option>${cities.map(c=>`<option value="${c.id}" ${c.id===state.radarCity?'selected':''}>📍 ${esc(c.name)}</option>`).join('')}</select>` : '') + '</div>';
+  const countryItems = rows.filter(r=>r.kind==='c' && r.key===cc);
+  if(!city) return head + radarArtistList(countryItems);
+  // ville : titres électro du classement de la ville ; s'il y en a trop peu, on garde le classement du pays
+  const [entries, uni] = await Promise.all([fetchRealCityChart(city.id, 'spotify', 'today'), loadElectronicUniverse()]);
+  const electro = (entries||[]).filter(e=>e.tracks && isElectronicEntry(uni, e.tracks));
+  if(electro.length<5) return head + `<div class="hpad" style="font-size:10.5px;color:var(--text-muted);margin-bottom:6px;">Pas assez de titres électro dans le classement de ${esc(city.name)} : voici le classement électro du pays.</div>` + radarArtistList(countryItems);
+  return head + radarArtistList(electro.map((e,i)=>({artist:e.tracks.artist_name||'', ct:coreTitle(e.tracks.title), rank:i+1, prev:null})));
+}
 function radarSavedHTML(rows){
   const favs = Object.values(favMap);
   if(!favs.length) return `<div class="empty-msg">Aucun favori.<br>Touchez le ♡ sur un morceau pour le suivre ici : vous verrez dans quels classements il apparaît. 📡</div>`;
@@ -4155,6 +4180,8 @@ document.addEventListener('click', async (e)=>{
   else if(a==='set-lang'){ setLang(el.dataset.lang); }
 });
 document.addEventListener('change', (e)=>{
+  if(e.target.dataset.action==='radar-country'){ state.radarCountry = e.target.value; state.radarCity = ''; renderView(); }
+  if(e.target.dataset.action==='radar-city'){ state.radarCity = e.target.value; renderView(); }
   if(e.target.dataset.action==='select-country'){ state.selectedCountry = e.target.value; state.countryCity = ''; renderView(); }
   if(e.target.dataset.action==='select-country-city'){ state.countryCity = e.target.value; renderView(); }
   if(e.target.dataset.action==='select-city'){ state.selectedCity = e.target.value; renderView(); }
