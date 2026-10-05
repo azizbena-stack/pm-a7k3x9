@@ -3310,7 +3310,8 @@ async function loadRadar(){
 /* ---------------------------- STATISTIQUES ARTISTE (gratuit) ----------------------------
    Présence dans nos classements (genres + pays, positions, mouvements) + catalogue public Apple Music
    (nombre de titres, sorties par année, genres, dernières sorties). Écoutes/followers : nécessiteraient une API payante. */
-const statTile = (v,l)=>`<div style="flex:1 1 30%;min-width:96px;background:var(--card-2);border:1px solid var(--border-soft);border-radius:14px;padding:12px 8px;text-align:center;"><div class="tabular" style="font-size:20px;font-weight:800;">${v}</div><div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">${l}</div></div>`;
+const spark = ser => { if(!ser || ser.length<2) return ''; const mn = Math.min(...ser), mx = Math.max(...ser), W = 70, H = 18, pts = ser.map((v,i)=>(i*W/(ser.length-1)).toFixed(1)+','+(mx===mn ? H/2 : H-2-(v-mn)/(mx-mn)*(H-4)).toFixed(1)).join(' '); return `<svg viewBox="0 0 ${W} ${H}" width="70" height="${H}" style="margin-top:4px;"><polyline points="${pts}" fill="none" stroke="#a78bfa" stroke-width="1.6"/></svg>`; };
+const statTile = (v,l,d,ser)=>`<div style="flex:1 1 30%;min-width:96px;background:var(--card-2);border:1px solid var(--border-soft);border-radius:14px;padding:12px 8px;text-align:center;"><div class="tabular" style="font-size:20px;font-weight:800;">${v}</div><div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">${l}</div>${d ? `<div style="font-size:10.5px;font-weight:700;color:${d>0?'#2ecc71':'#ff6b6b'};">${d>0?'+':''}${d}</div>` : ''}${spark(ser)}</div>`;
 let worldP = null;
 const fetchWorld = () => worldP || (worldP = fetch('world.json').then(r=>r.ok?r.json():null).catch(()=>null).then(w=>{ if(!w) worldP = null; return w; }));
 // Carte du monde : indice de présence = somme de (101 - place) des titres de l'artiste dans le classement électro de chaque pays, ramené à 100 pour le pays n°1.
@@ -3354,7 +3355,15 @@ async function loadArtistStats(){
   if(!mine.length) out += '<div class="empty-msg">Aucun titre de cet artiste dans les classements actuels (genres et pays).</div>';
   else {
     const g = new Set(mine.filter(r=>r.kind==='g').map(r=>r.key)), c = new Set(mine.filter(r=>r.kind==='c').map(r=>r.key));
-    out += tiles([statTile(new Set(mine.map(r=>r.ct)).size,'titres classés'), statTile(g.size,'genres'), statTile(c.size,'pays'), statTile('#'+Math.min(...ranks),'meilleure place'), statTile(Math.round(ranks.reduce((a,b)=>a+b,0)/ranks.length),'place moyenne'), statTile(mine.filter(r=>r.prev!=null && r.prev>r.rank).length,'en hausse')])
+    // historique : un instantané par jour et par artiste, gardé sur cet appareil (60 jours) ; les courbes apparaissent dès le 2e jour de visite
+    const nT = new Set(mine.map(r=>r.ct)).size, best = Math.min(...ranks), score = mine.filter(r=>r.kind==='c').reduce((a,r)=>a+101-r.rank,0), day = new Date().toISOString().slice(0,10);
+    const H = lsObj('pm_hist'), hk = normText(name), mine_h = H[hk] = H[hk] || {};
+    mine_h[day] = [nT, c.size, best, score];
+    Object.keys(mine_h).sort().slice(0,-60).forEach(k=>delete mine_h[k]);
+    try{ localStorage.setItem('pm_hist', JSON.stringify(H)); }catch(e){}
+    const days = Object.keys(mine_h).sort(), ser = i => days.map(k=>mine_h[k][i]), dlt = (i,inv) => days.length>1 ? (inv ? -1 : 1)*(mine_h[days[days.length-1]][i]-mine_h[days[0]][i]) : 0;
+    out += tiles([statTile(nT,'titres classés',dlt(0),ser(0)), statTile(g.size,'genres'), statTile(c.size,'pays',dlt(1),ser(1)), statTile('#'+best,'meilleure place',dlt(2,true),ser(2).map(v=>-v)), statTile(score,'indice pays',dlt(3),ser(3)), statTile(Math.round(ranks.reduce((a,b)=>a+b,0)/ranks.length),'place moyenne'), statTile(mine.filter(r=>r.prev!=null && r.prev>r.rank).length,'en hausse')])
+      + `<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:6px;">${days.length>1 ? 'Évolution depuis le '+days[0] : "Les courbes d'évolution apparaissent dès votre prochaine visite."}</div>`
       + h('📍 Où il est classé') + mine.slice().sort((a,b)=>a.rank-b.rank).slice(0,15).map(r=>`<div class="alert-item"><div class="aic">${r.kind==='g'?'🎧':'🌍'}</div><div><div class="at">${esc(r.title)}</div><div class="ad">${esc(radarWhere(r).slice(3))} · #${r.rank} ${realTrackMoveHTML(r.rank,r.prev)}</div></div></div>`).join('');
   }
   out += h('🗺️ Où il est écouté') + worldMapHTML(world, mine);
@@ -3367,7 +3376,7 @@ async function loadArtistStats(){
     const latest = cat.slice().sort((a,b)=>(b.releaseDate||'').localeCompare(a.releaseDate||''));
     out += tiles([statTile(cat.length>=190?'200+':cat.length,'titres'), statTile(new Set(cat.map(x=>x.collectionName)).size,'sorties'), statTile(years[0]||'–','première sortie'), statTile((latest[0].releaseDate||'').slice(0,7)||'–','dernière sortie')])
       + (topG ? `<div class="hpad" style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Genres Apple : ${esc(topG)}</div>` : '')
-      + h('📅 Titres par année') + `<div class="hpad" style="display:flex;align-items:flex-end;gap:5px;height:90px;">${years.map(y=>`<div style="flex:1;text-align:center;font-size:9px;color:var(--text-muted);"><div style="background:#7c5cff;border-radius:4px 4px 0 0;height:${Math.max(4,Math.round(yr[y]/max*62))}px;"></div>${y.slice(2)}</div>`).join('')}</div>`
+      + h('📅 Titres par année') + `<div class="hpad" style="display:flex;align-items:flex-end;gap:5px;height:110px;">${years.map(y=>`<div style="flex:1;text-align:center;font-size:9px;color:var(--text-muted);"><div style="font-size:10px;font-weight:800;color:#fff;">${yr[y]}</div><div style="background:#7c5cff;border-radius:4px 4px 0 0;height:${Math.max(4,Math.round(yr[y]/max*62))}px;"></div>${y.slice(2)}</div>`).join('')}</div>`
       + h('🆕 Dernières sorties') + latest.slice(0,5).map((x,i)=>{ const art = (x.artworkUrl100||'').replace('100x100','300x300')||null; if(x.previewUrl) itStore[itKey({title:x.trackName, artist:x.artistName})] = { p:x.previewUrl, v:x.trackViewUrl||null, a:art, t:Date.now() }; return radarCard(x.trackName, x.artistName, art, radarMatch(rows,x.trackName,x.artistName), i, esc((x.releaseDate||'').slice(0,10))); }).join('');
   }
   out += h('🔗 Voir l\'artiste') + `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;">${platformLinks(name, cat && cat[0] && cat[0].artistViewUrl)}</div>`
