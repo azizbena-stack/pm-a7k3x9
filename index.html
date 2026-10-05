@@ -2453,7 +2453,6 @@ function noPreviewHTML(){
    Spotify et YouTube se lisent dans l'app quand l'identifiant du morceau est connu, sinon la recherche s'ouvre sur le service. */
 const PLAY_SOURCE_KEY = 'pulse_play_source';
 function getPlaySource(){
-  if(!isPro()) return 'apple';
   try{ const v = localStorage.getItem(PLAY_SOURCE_KEY); if(v==='spotify'||v==='youtube'||v==='apple') return v; }catch(e){}
   return 'apple';
 }
@@ -2482,15 +2481,15 @@ function openPlayChoice(id){
       <button class="close-btn" data-action="close-play-choice">✕</button></div>
     <div style="display:flex;flex-direction:column;gap:9px;">
       ${b('youtube','▶️ YouTube', t.youtubeId ? "Lecteur YouTube dans l'app" : 'Ouvre la recherche YouTube')}
-      ${isPro() ? b('apple','🍎 Apple Music', "Extrait de 30 s directement dans l'app") : lockedChoice('🍎 Apple Music')}
-      ${isPro() ? b('spotify','🟢 Spotify', t.spotifyId ? "Lecteur Spotify dans l'app" : 'Ouvre la recherche Spotify') : lockedChoice('🟢 Spotify')}
-      ${isPro() ? b('beatport','🟠 Beatport','Ouvrir le morceau sur Beatport') : lockedChoice('🟠 Beatport')}
+      ${b('apple','🍎 Apple Music', "Extrait de 30 s directement dans l'app")}
+      ${b('spotify','🟢 Spotify', t.spotifyId ? "Lecteur Spotify dans l'app" : 'Ouvre la recherche Spotify')}
+      ${b('beatport','🟠 Beatport','Ouvrir le morceau sur Beatport')}
     </div></div>`;
 }
 function playSourceHTML(){
   const cur = getPlaySource();
   const opts = [['apple','Apple Music'],['spotify','Spotify'],['youtube','YouTube']];
-  return `<div class="hpad"><div style="font-size:10.5px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">SOURCE DE LECTURE ${isPro()?'':'🔒 PRO'}</div>
+  return `<div class="hpad"><div style="font-size:10.5px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">SOURCE DE LECTURE</div>
     <div class="chiprow" style="padding:0;">${opts.map(([k,l])=>`<div class="chip ${cur===k?'active':''}" data-action="set-play-source" data-s="${k}">${l}</div>`).join('')}</div></div>`;
 }
 /* Pochettes manquantes (la synchro n'en a qu'une partie) : complétées via l'artwork Apple dès que la ligne devient visible. */
@@ -3910,12 +3909,10 @@ document.addEventListener('click', async (e)=>{
   else if(a==='play-with'){
     document.getElementById('playChoice').classList.add('hidden');
     if(el.dataset.s==='beatport'){ const tt = TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]; if(tt) window.open(externalSearchUrl('Beatport', tt), '_blank', 'noopener'); }
-    else if(!isPro() && el.dataset.s!=='youtube') openPaywall();
     else togglePlay(el.dataset.id, el.dataset.s);
   }
   else if(a==='close-play-choice'){ document.getElementById('playChoice').classList.add('hidden'); }
   else if(a==='set-play-source'){
-    if(!isPro()){ openPaywall(); return; }
     try{ localStorage.setItem(PLAY_SOURCE_KEY, el.dataset.s); }catch(e){}
     if(!document.getElementById('trackOverlay').classList.contains('hidden')) renderTrackOverlay(); else renderView();
   }
