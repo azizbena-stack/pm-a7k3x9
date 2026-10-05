@@ -641,7 +641,13 @@ async function renderSearch(){
     const rows = await loadRadarRows(), gk = genreKeysFor(words, rows), per = gk.length>2 ? 10 : 30, seen = new Set();
     list = [...gk.flatMap(k=>genreTop(rows,k,per)).map(r=>({title:r.title, artist_name:r.artist, cover_url:r.cover, youtube_id:null})), ...list]
       .filter(t=>{ const k = coreTitle(t.title)+'|'+normText(t.artist_name); return !seen.has(k) && seen.add(k); }).slice(0,60); }
-  host.innerHTML = list.length ? list.map((tr_,i)=>renderRealTrackRow({rank:i+1, previous_rank:null, tracks:tr_}, i, false)).join('') : '<div class="empty-msg">Aucun résultat.</div>';
+  host.innerHTML = (list.length ? list.map((tr_,i)=>renderRealTrackRow({rank:i+1, previous_rank:null, tracks:tr_}, i, false)).join('') : '<div class="empty-msg">Aucun résultat dans nos classements.</div>')
+    + (searchFav ? '' : '<div class="section-title"><h2>🍎 Catalogue Apple Music</h2></div><div id="searchApple"><div class="empty-msg">Recherche…</div></div>');
+  if(!searchFav){
+    clearTimeout(radarAppleTimer);
+    const q = document.getElementById('searchInp').value.trim(), rows = await loadRadarRows();
+    radarAppleTimer = setTimeout(()=>loadRadarApple(q, rows, 'searchInp', 'searchApple'), 700);
+  }
 }
 function openSearch(){
   const ov = document.getElementById('searchOv');
@@ -3323,10 +3329,11 @@ async function renderRadarSearch(){
 }
 // Artistes et morceaux hors classements : recherche publique Apple Music (gratuite, déjà utilisée pour les extraits).
 const radarAppleCache = new Map(); let radarAppleTimer = null;
-async function loadRadarApple(q, rows){
+async function loadRadarApple(q, rows, inId, hostId){
+  inId = inId || 'radarInp'; hostId = hostId || 'radarApple';
   let r = radarAppleCache.get(q);
   if(!r){ r = await itunesSearchOnce(q, 25); if(r.ok) radarAppleCache.set(q, r); }
-  const inp = document.getElementById('radarInp'), host = document.getElementById('radarApple');
+  const inp = document.getElementById(inId), host = document.getElementById(hostId);
   if(!host || !inp || inp.value.trim()!==q) return; // l'utilisateur a changé de recherche
   if(!r.ok){ host.innerHTML = '<div class="empty-msg">Recherche Apple indisponible pour le moment, réessayez dans une minute.</div>'; return; }
   const seen = new Set(), now = Date.now();
