@@ -2243,7 +2243,7 @@ function itunesHitMatches(queryTitle, queryArtist, hitTrackName, hitArtistName){
   const artistOk = artistWords.length===0 || artistWords.some(w=>hArtist.includes(w));
   return titleRatio >= 0.6 && artistOk;
 }
-async function itunesSearchOnce(term){
+async function itunesSearchOnce(term, limit){
   // Mobile connections are more prone to a slow/stalled request than desktop
   // wifi — cap each attempt at 6s so a bad network degrades to the next
   // fallback (a cleaner search term, then the generated preview) quickly
@@ -2252,7 +2252,7 @@ async function itunesSearchOnce(term){
   const timer = controller ? setTimeout(()=>controller.abort(), 6000) : null;
   try{
     const q = encodeURIComponent(term);
-    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=10`, controller ? {signal: controller.signal} : {});
+    const res = await fetch(`https://itunes.apple.com/search?term=${q}&media=music&entity=song&limit=${limit||10}`, controller ? {signal: controller.signal} : {});
     if(!res.ok) return {ok:false};
     const data = await res.json();
     const results = (data && Array.isArray(data.results)) ? data.results : [];
@@ -3264,10 +3264,11 @@ function radarMatch(rows, title, artist){
   const ct = coreTitle(title), w = sigWords(artist,2);
   return rows.filter(r=>r.ct===ct && (!w.length || w.some(x=>r.na.includes(x))));
 }
-function radarCard(title, artist, cover, ms, i){
-  const chips = ms.length
+function radarCard(title, artist, cover, ms, i, note){
+  let chips = ms.length
     ? ms.slice().sort((a,b)=>a.rank-b.rank).map(r=>`<span class="chip" style="cursor:default;">${radarWhere(r)} #${r.rank} ${realTrackMoveHTML(r.rank,r.prev)}</span>`).join('')
     : '<span style="font-size:11px;color:var(--text-muted);">Pas dans les classements actuels</span>';
+  if(note) chips += `<span style="font-size:11px;color:var(--text-muted);margin-left:4px;">${note}</span>`;
   return `<div>${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title, artist_name:artist, cover_url:cover, youtube_id:null}}, i, false)}<div class="chiprow" style="padding:0 18px 10px;flex-wrap:wrap;overflow:visible;">${chips}</div></div>`;
 }
 function renderRadar(){
@@ -3303,7 +3304,28 @@ async function renderRadarSearch(){
   const uniq = new Map();
   rows.forEach(r=>{ if(words.every(w=>r.q.includes(w))){ const k = r.ct+'|'+normText(r.artist.split(/[,&]/)[0]); if(!uniq.has(k)) uniq.set(k,r); } });
   const list = [...uniq.values()].slice(0,30);
-  host.innerHTML = list.length ? list.map((r,i)=>radarCard(r.title, r.artist, r.cover, radarMatch(rows,r.title,r.artist), i)).join('') : '<div class="empty-msg">Aucun résultat dans nos classements.</div>';
+  const h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
+  host.innerHTML = h('🏆 Dans nos classements') + (list.length ? list.map((r,i)=>radarCard(r.title, r.artist, r.cover, radarMatch(rows,r.title,r.artist), i)).join('') : '<div class="empty-msg">Aucun résultat dans nos classements.</div>')
+    + h('🍎 Catalogue Apple Music') + '<div id="radarApple"><div class="empty-msg">Recherche…</div></div>';
+  clearTimeout(radarAppleTimer);
+  const q = inp.value.trim();
+  radarAppleTimer = setTimeout(()=>loadRadarApple(q, rows), 700);
+}
+// Artistes et morceaux hors classements : recherche publique Apple Music (gratuite, déjà utilisée pour les extraits).
+const radarAppleCache = new Map(); let radarAppleTimer = null;
+async function loadRadarApple(q, rows){
+  let r = radarAppleCache.get(q);
+  if(!r){ r = await itunesSearchOnce(q, 25); if(r.ok) radarAppleCache.set(q, r); }
+  const inp = document.getElementById('radarInp'), host = document.getElementById('radarApple');
+  if(!host || !inp || inp.value.trim()!==q) return; // l'utilisateur a changé de recherche
+  if(!r.ok){ host.innerHTML = '<div class="empty-msg">Recherche Apple indisponible pour le moment, réessayez dans une minute.</div>'; return; }
+  const seen = new Set(), now = Date.now();
+  const list = r.results.filter(x=>x.trackName && x.artistName && !seen.has(coreTitle(x.trackName)+'|'+normText(x.artistName)) && seen.add(coreTitle(x.trackName)+'|'+normText(x.artistName)));
+  host.innerHTML = list.length ? list.map((x,i)=>{
+    const art = (x.artworkUrl100||'').replace('100x100','300x300') || null;
+    if(x.previewUrl) itStore[itKey({title:x.trackName, artist:x.artistName})] = { p:x.previewUrl, v:x.trackViewUrl||null, a:art, t:now };
+    return radarCard(x.trackName, x.artistName, art, radarMatch(rows,x.trackName,x.artistName), i, esc((x.releaseDate||'').slice(0,4)));
+  }).join('') : '<div class="empty-msg">Aucun résultat sur Apple Music.</div>';
 }
 function radarAlertsHTML(rows){
   const item = (icon,title,body)=>`<div class="alert-item"><div class="aic">${icon}</div><div><div class="at">${title}</div><div class="ad">${body}</div></div></div>`;
