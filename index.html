@@ -134,6 +134,9 @@ button{font-family:inherit;}
 .t-sub{ font-size:11.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; display:flex; align-items:center; gap:5px;}
 .genre-dot{ width:6px;height:6px;border-radius:50%; flex:0 0 6px; display:inline-block;}
 .t-right{ text-align:right; flex:0 0 auto;}
+.mk{ display:inline-block; margin-left:8px; font-size:17px; color:var(--text-muted); cursor:pointer; user-select:none;}
+.mk.heart.on{ color:#ff4d6d;}
+.mk.seen.on{ color:#2ecc71; font-weight:800;}
 .t-score{ font-size:14px; font-weight:800;}
 .t-trend{ font-size:11px; font-weight:800; margin-top:2px;}
 .t-trend.up{ color:var(--good-text);}
@@ -300,6 +303,7 @@ button{font-family:inherit;}
   <div id="genreOverlay" class="overlay sheet hidden"></div>
 
   <!-- PLAY CHOICE -->
+  <div id="searchOv" class="overlay hidden" style="z-index:55"></div>
   <div id="playChoice" class="overlay sheet hidden"></div>
 
   <!-- PAYWALL -->
@@ -356,10 +360,10 @@ const GENRES = [
   // 2026-10-04 : Afro Tech retiré ; Indie Dance, Hard Techno, Funky House, Indie Tech
   // et Disco House ajoutés sur demande (pas encore de morceaux dans le catalogue
   // ni de classement réel synchronisé : la liste affiche un message d'attente).
+  {id:'house', name:'House', color:'#c9a227'},
   {id:'indie-dance', name:'Indie Dance', color:'#e5a000'},
   {id:'hard-techno', name:'Hard Techno', color:'#e04343'},
   {id:'funky-house', name:'Funky House', color:'#e0b100'},
-  {id:'indie-tech', name:'Indie Tech', color:'#6aa84f'},
   {id:'disco-house', name:'Disco House', color:'#d65db1'},
 ];
 const genreById = id => GENRES.find(g=>g.id===id);
@@ -588,6 +592,58 @@ function isPlaceholderTitle(title){
   return false;
 }
 const FREE_LIMIT_TRACKS = 20; // doit rester identique à freeLimit dans renderHome
+/* ---------------------------- FAVORIS / DÉJÀ ÉCOUTÉ / RECHERCHE ---------------------------- */
+function lsObj(k){ try{ return JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return {}; } }
+const favMap = lsObj('pm_fav'), seenMap = lsObj('pm_seen');
+function lsSave(){ try{ localStorage.setItem('pm_fav',JSON.stringify(favMap)); localStorage.setItem('pm_seen',JSON.stringify(seenMap)); }catch(e){} }
+function trackMarksHTML(t){
+  const k = itKey(t);
+  return `<span class="mk heart${favMap[k]?' on':''}" data-action="toggle-heart" data-id="${t.id}">${favMap[k]?'♥':'♡'}</span><span class="mk seen${seenMap[k]?' on':''}" data-k="${esc(k)}">✓</span>`;
+}
+function markSeen(t){
+  const k = itKey(t); if(seenMap[k]) return;
+  seenMap[k] = 1; lsSave();
+  document.querySelectorAll('.seen').forEach(el=>{ if(el.dataset.k===k) el.classList.add('on'); });
+}
+function toggleHeart(id){
+  const t = TRACKS.find(x=>x.id===id) || realTracksCache[id]; if(!t) return;
+  const k = itKey(t);
+  if(favMap[k]) delete favMap[k]; else favMap[k] = {title:t.title, artist:t.artist};
+  lsSave();
+  document.querySelectorAll('.heart').forEach(el=>{ if(el.dataset.id===id){ el.classList.toggle('on',!!favMap[k]); el.textContent = favMap[k]?'♥':'♡'; } });
+}
+let searchIdx = null, searchFav = false;
+async function loadSearchIndex(){
+  if(searchIdx) return searchIdx;
+  const seen = new Map();
+  for(const table of ['genre_chart_entries','country_electronic_entries']){
+    for(let off=0; off<8000; off+=1000){
+      try{
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=title,artist_name,cover_url&order=id.asc&limit=1000&offset=${off}`, { headers: SUPABASE_HEADERS });
+        const rows = await res.json();
+        if(!Array.isArray(rows) || !rows.length) break;
+        rows.forEach(r=>{ if(isPlaceholderTitle(r.title)) return; const k = coreTitle(r.title)+'|'+normText(r.artist_name); if(!seen.has(k)) seen.set(k,{title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null, q:normText(r.title+' '+r.artist_name)}); });
+        if(rows.length<1000) break;
+      }catch(e){ break; }
+    }
+  }
+  return searchIdx = [...seen.values()];
+}
+async function renderSearch(){
+  const host = document.getElementById('searchRes'); if(!host) return;
+  const words = normText(document.getElementById('searchInp').value).split(' ').filter(Boolean);
+  let list;
+  if(searchFav) list = Object.values(favMap).map(f=>({title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}));
+  else if(!words.length){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre.</div>'; return; }
+  else { host.innerHTML = '<div class="empty-msg">Recherche…</div>'; const idx = await loadSearchIndex(); list = idx.filter(r=>words.every(w=>r.q.includes(w))).slice(0,50); }
+  host.innerHTML = list.length ? list.map((tr_,i)=>renderRealTrackRow({rank:i+1, previous_rank:null, tracks:tr_}, i, false)).join('') : '<div class="empty-msg">Aucun résultat.</div>';
+}
+function openSearch(){
+  const ov = document.getElementById('searchOv');
+  ov.innerHTML = `<div class="overlay-header"><input id="searchInp" type="search" placeholder="🔍 Artiste ou musique" oninput="renderSearch()" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;margin-right:8px;"><button class="icon-btn" data-action="search-fav" id="searchFavBtn">♡ Favoris</button><button class="icon-btn" data-action="close-search">✕</button></div><div id="searchRes" style="overflow-y:auto;flex:1;padding-bottom:90px;"></div>`;
+  searchFav = false; ov.classList.remove('hidden'); renderSearch();
+  document.getElementById('searchInp').focus();
+}
 function renderRealTrackRow(entry, idx, locked){
   const t = entry.tracks || {};
   const seedKey = (t.title||'')+'|'+(t.artist_name||'');
@@ -623,7 +679,7 @@ function renderRealTrackRow(entry, idx, locked){
       <div class="t-title">${esc(t2.title)}</div>
       <div class="t-sub">${esc(t2.artist)}</div>
     </div>
-    <div class="t-right">${realTrackMoveHTML(entry.rank, entry.previous_rank)}</div>
+    <div class="t-right">${realTrackMoveHTML(entry.rank, entry.previous_rank)}${trackMarksHTML(t2)}</div>
   </div>`;
 }
 function realChartPlatformTabsHTML(action, selected){
@@ -2462,6 +2518,7 @@ function scanLazyCovers(){
 async function togglePlay(id, forcedSource){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
+  markSeen(t);
   state.noPreview = null;
   const src = forcedSource || 'apple';
   if(src==='spotify'){
@@ -2690,7 +2747,7 @@ function quickGenreActive(key){
 // catalogue de ces 2 genres (demande explicite) — plus de chip, plus de
 // chart réel accessible depuis l'app pour ces 2-là.
 // Genres qui ont un vrai Top 100 synchronisé (indie-tech n'a pas de classement chez Beatport : reste sur le message d'attente).
-const REAL_GENRE_KEYS = ['afro-house','melodic','indie-dance','hard-techno','deep-house','funky-house','minimal-deeptech','progressive-house','disco-house'];
+const REAL_GENRE_KEYS = ['afro-house','melodic','house','indie-dance','hard-techno','deep-house','funky-house','minimal-deeptech','progressive-house','disco-house'];
 function activeRealGenreKey(){
   return REAL_GENRE_KEYS.find(k=>quickGenreActive(k)) || null;
 }
@@ -2743,12 +2800,13 @@ function renderHome(){
     const pa = state.trendingPeriod==='24h'?a.trend24h:state.trendingPeriod==='30d'?a.trend30d:a.trend7d;
     const pb = state.trendingPeriod==='24h'?b.trend24h:state.trendingPeriod==='30d'?b.trend30d:b.trend7d;
     return pb-pa;
-  }).slice(0,8);
+  }).slice(0,50);
 
   return `
   <div class="topbar">
     <div class="brand-row">
       <div class="brand"><span class="dot"></span>Pulse Music<small>${tr('home.brandSmall')}</small></div>
+      <button class="icon-btn" data-action="open-search">🔍</button>
       <button class="icon-btn" data-action="nav" data-view="radar">🔔${state.favTracks.size? '<span class=\"badge-dot\"></span>':''}</button>
     </div>
     <div class="segmented">
@@ -2779,11 +2837,11 @@ function renderHome(){
       <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
       <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
       <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
+      <div class="chip ${quickGenreActive('house')?'active':''}" data-action="quickgenre" data-g="house">HOUSE</div>
       <div class="chip ${quickGenreActive('indie-dance')?'active':''}" data-action="quickgenre" data-g="indie-dance">INDIE DANCE</div>
       <div class="chip ${quickGenreActive('hard-techno')?'active':''}" data-action="quickgenre" data-g="hard-techno">HARD TECHNO</div>
       <div class="chip ${quickGenreActive('deep-house')?'active':''}" data-action="quickgenre" data-g="deep-house">DEEP HOUSE</div>
       <div class="chip ${quickGenreActive('funky-house')?'active':''}" data-action="quickgenre" data-g="funky-house">FUNKY HOUSE</div>
-      <div class="chip ${quickGenreActive('indie-tech')?'active':''}" data-action="quickgenre" data-g="indie-tech">INDIE TECH</div>
       <div class="chip ${quickGenreActive('minimal-deeptech')?'active':''}" data-action="quickgenre" data-g="minimal-deeptech">MINIMAL</div>
       <div class="chip ${quickGenreActive('progressive-house')?'active':''}" data-action="quickgenre" data-g="progressive-house">PROGRESSIVE</div>
       <div class="chip ${quickGenreActive('disco-house')?'active':''}" data-action="quickgenre" data-g="disco-house">DISCO HOUSE</div>
@@ -2797,8 +2855,8 @@ function renderHome(){
     <span class="link" data-action="set-trending-period" data-p="${state.trendingPeriod==='24h'?'7d':state.trendingPeriod==='7d'?'30d':'24h'}">${state.trendingPeriod.toUpperCase()} ⟳</span>
   </div>
   <div class="hscroll">
-    ${trending.map(t=>`
-      <div class="next-card" style="flex:0 0 168px;" data-action="open-track" data-id="${t.id}">
+    ${trending.map((t,i)=>`
+      <div class="next-card ${!isPro()&&i>=10?'lock-row':''}" style="flex:0 0 168px;" ${!isPro()&&i>=10?'':`data-action="open-track" data-id="${t.id}"`}>
         <div class="glow"></div>
         ${coverHTML(t,false)}
         <div style="font-weight:700;font-size:12.5px;margin-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.title)}</div>
@@ -2968,7 +3026,7 @@ function renderTrackRow(t, idx, locked){
     </div>
     <div class="t-right">
       <div class="t-score tabular">${t.djScore}<span style="color:var(--text-muted);font-weight:600;font-size:10.5px;">/100</span></div>
-      ${trendBadge(trend)}
+      ${trendBadge(trend)}${trackMarksHTML(t)}
     </div>
   </div>`;
 }
@@ -3784,6 +3842,10 @@ document.addEventListener('click', async (e)=>{
   }
   else if(a==='set-trending-period'){ state.trendingPeriod = el.dataset.p; renderView(); }
   else if(a==='open-track'){ openTrack(el.dataset.id); }
+  else if(a==='toggle-heart'){ toggleHeart(el.dataset.id); }
+  else if(a==='open-search'){ openSearch(); }
+  else if(a==='close-search'){ document.getElementById('searchOv').classList.add('hidden'); }
+  else if(a==='search-fav'){ searchFav = !searchFav; el.textContent = searchFav?'♥ Favoris':'♡ Favoris'; renderSearch(); }
   else if(a==='close-track'){ closeTrack(); }
   else if(a==='chart-period'){ state.trackChartPeriod = el.dataset.p; renderTrackOverlay(); }
   else if(a==='toggle-fav'){
