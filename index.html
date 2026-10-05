@@ -2794,7 +2794,7 @@ function renderView(){
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
   else if(state.view==='playlists') c.innerHTML = renderPlaylists();
-  else if(state.view==='radar') c.innerHTML = renderRadar();
+  else if(state.view==='radar'){ c.innerHTML = renderRadar(); loadRadar(); }
   else if(state.view==='profile') c.innerHTML = renderProfile();
   c.scrollTop = 0;
 }
@@ -3236,55 +3236,90 @@ const ALERTS_I18N = {
   ],
 };
 
+/* ---------------------------- RADAR (gratuit, à partir de nos propres classements) ----------------------------
+   Pour chaque morceau/artiste : dans quels classements genre et pays il figure, avec la position et le mouvement
+   (previous_rank). Les alertes sont calculées sur ces mêmes données. Aucune source payante ajoutée. */
+const RADAR_GENRE = {'melodic':'Melodic House & Techno','techno':'Techno'};
+let radarRowsP = null;
+function loadRadarRows(){
+  return radarRowsP || (radarRowsP = (async()=>{
+    const out = [];
+    for(const [table,col,kind] of [['genre_chart_entries','genre_key','g'],['country_electronic_entries','country_code','c']]){
+      for(let off=0; off<8000; off+=1000){
+        try{
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${col},rank,previous_rank,title,artist_name,cover_url&order=id.asc&limit=1000&offset=${off}`, { headers: SUPABASE_HEADERS });
+          const rows = await res.json();
+          if(!Array.isArray(rows) || !rows.length) break;
+          rows.forEach(r=>{ if(!isPlaceholderTitle(r.title)) out.push({kind, key:r[col], rank:r.rank, prev:r.previous_rank, title:r.title, artist:r.artist_name||'', cover:r.cover_url, ct:coreTitle(r.title), na:normText(r.artist_name), q:normText(r.title+' '+r.artist_name)}); });
+          if(rows.length<1000) break;
+        }catch(e){ break; }
+      }
+    }
+    if(!out.length) radarRowsP = null; // échec réseau : on réessaiera
+    return out;
+  })());
+}
+const radarWhere = r => r.kind==='g' ? '🎧 '+(RADAR_GENRE[r.key]||(genreById(r.key)||{}).name||r.key) : '🌍 '+cname(r.key);
+function radarMatch(rows, title, artist){
+  const ct = coreTitle(title), w = sigWords(artist,2);
+  return rows.filter(r=>r.ct===ct && (!w.length || w.some(x=>r.na.includes(x))));
+}
+function radarCard(title, artist, cover, ms, i){
+  const chips = ms.length
+    ? ms.slice().sort((a,b)=>a.rank-b.rank).map(r=>`<span class="chip" style="cursor:default;">${radarWhere(r)} #${r.rank} ${realTrackMoveHTML(r.rank,r.prev)}</span>`).join('')
+    : '<span style="font-size:11px;color:var(--text-muted);">Pas dans les classements actuels</span>';
+  return `<div>${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title, artist_name:artist, cover_url:cover, youtube_id:null}}, i, false)}<div class="chiprow" style="padding:0 18px 10px;flex-wrap:wrap;overflow:visible;">${chips}</div></div>`;
+}
 function renderRadar(){
-  const favTracks = TRACKS.filter(t=>state.favTracks.has(t.id));
+  const n = Object.keys(favMap).length, t = state.radarTab;
+  const tab = (k,l)=>`<div class="chip ${t===k?'active':''}" data-action="radar-tab" data-t="${k}">${l}</div>`;
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('radar.title')}</div></div>
-    <div class="radar-tabs">
-      <div class="chip ${state.radarTab==='saved'?'active':''}" data-action="radar-tab" data-t="saved">📡 Radar (${favTracks.length})</div>
-      <div class="chip ${state.radarTab==='alerts'?'active':''}" data-action="radar-tab" data-t="alerts">${tr('radar.alertsTab')}</div>
-    </div>
+    <div class="radar-tabs">${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}</div>
   </div>
-  ${state.radarTab==='saved' ? renderRadarSaved(favTracks) : renderRadarAlerts()}
+  ${t==='search' ? `<div class="hpad" style="margin:8px 0;"><input id="radarInp" type="search" placeholder="Artiste ou morceau : où est-il classé ?" oninput="renderRadarSearch()" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"></div>` : ''}
+  <div id="radarBody"><div class="empty-msg">Chargement…</div></div>
   <div style="height:10px;"></div>`;
 }
-function renderRadarSaved(favTracks){
-  if(favTracks.length===0){
-    return `<div class="empty-msg">${tr('radar.empty')}</div>`;
-  }
-  return `
-  <div class="track-list" style="margin-top:6px;">
-    ${favTracks.map(t=>`
-      <div class="track-row" data-action="open-track" data-id="${t.id}">
-        ${coverHTML(t,false)}
-        <div class="t-info">
-          <div class="t-title">${esc(t.title)}</div>
-          <div class="t-sub">${esc(t.artist)} · ${tr('radar.thisWeek')}</div>
-        </div>
-        <div class="t-right">${trendBadge(t.trend7d)}</div>
-      </div>`).join('')}
-  </div>
-  ${state.favGenres.size || state.favCities.size ? `
-  <div class="divider"></div>
-  <div class="hpad">
-    ${state.favGenres.size? `<div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">${tr('radar.followedGenres')}</div><div class="chiprow" style="padding:0 0 10px;">${[...state.favGenres].map(g=>`<div class="chip active">${genreById(g)?.name || g}</div>`).join('')}</div>`:''}
-    ${state.favCities.size? `<div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">${tr('radar.followedCities')}</div><div class="chiprow" style="padding:0;">${[...state.favCities].map(c=>`<div class="chip active">${cityById(c).name}</div>`).join('')}</div>`:''}
-  </div>` : ''}
-  `;
+async function loadRadar(){
+  const t = state.radarTab;
+  if(t==='search'){ renderRadarSearch(); return; }
+  const rows = await loadRadarRows(), host = document.getElementById('radarBody');
+  if(!host || state.view!=='radar' || state.radarTab!==t) return;
+  host.innerHTML = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
 }
-function renderRadarAlerts(){
-  const alerts = ALERTS_I18N[state.lang] || ALERTS_I18N.fr;
-  return `<div style="margin-top:4px;">${alerts.map(a=>`
-    <div class="alert-item">
-      <div class="aic">${a.icon}</div>
-      <div>
-        <div class="at">${a.title}</div>
-        <div class="ad">${a.body}</div>
-        <div class="atime">${a.time}</div>
-      </div>
-    </div>`).join('')}
-  </div>`;
+function radarSavedHTML(rows){
+  const favs = Object.values(favMap);
+  if(!favs.length) return `<div class="empty-msg">Aucun favori.<br>Touchez le ♡ sur un morceau pour le suivre ici : vous verrez dans quels classements il apparaît. 📡</div>`;
+  return favs.map((f,i)=>radarCard(f.title, f.artist, null, radarMatch(rows,f.title,f.artist), i)).join('');
+}
+async function renderRadarSearch(){
+  const host = document.getElementById('radarBody'), inp = document.getElementById('radarInp'); if(!host || !inp) return;
+  const words = normText(inp.value).split(' ').filter(Boolean);
+  if(!words.length){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre pour voir où il est classé.</div>'; return; }
+  const rows = await loadRadarRows();
+  if(!document.getElementById('radarBody') || normText(inp.value).split(' ').filter(Boolean).join(' ')!==words.join(' ')) return;
+  const uniq = new Map();
+  rows.forEach(r=>{ if(words.every(w=>r.q.includes(w))){ const k = r.ct+'|'+normText(r.artist.split(/[,&]/)[0]); if(!uniq.has(k)) uniq.set(k,r); } });
+  const list = [...uniq.values()].slice(0,30);
+  host.innerHTML = list.length ? list.map((r,i)=>radarCard(r.title, r.artist, r.cover, radarMatch(rows,r.title,r.artist), i)).join('') : '<div class="empty-msg">Aucun résultat dans nos classements.</div>';
+}
+function radarAlertsHTML(rows){
+  const item = (icon,title,body)=>`<div class="alert-item"><div class="aic">${icon}</div><div><div class="at">${title}</div><div class="ad">${body}</div></div></div>`;
+  const favs = Object.values(favMap), mine = [];
+  favs.forEach(f=>radarMatch(rows,f.title,f.artist).forEach(r=>{
+    const d = r.prev==null ? null : r.prev-r.rank;
+    if(d===0) return;
+    mine.push({s: d==null ? 50 : Math.abs(d), h: d==null ? item('🆕',esc(f.title),`Nouveau dans ${esc(radarWhere(r))} : #${r.rank}`) : item(d>0?'📈':'📉',esc(f.title),`${esc(radarWhere(r))} : #${r.rank} (${d>0?'▲':'▼'} ${Math.abs(d)})`)});
+  }));
+  mine.sort((a,b)=>b.s-a.s);
+  const seen = new Set(), top = rows.filter(r=>r.prev!=null && r.prev>r.rank).sort((a,b)=>(b.prev-b.rank)-(a.prev-a.rank)).filter(r=>!seen.has(r.q) && seen.add(r.q)).slice(0,10)
+    .map(r=>item('📈',esc(r.title),`${esc(r.artist)} · ${esc(radarWhere(r))} : #${r.rank} (▲ ${r.prev-r.rank})`));
+  const h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
+  return h('♥ Vos favoris')
+    + (!favs.length ? '<div class="empty-msg">Mettez des morceaux en favori ♡ pour suivre leurs mouvements.</div>' : mine.length ? mine.map(m=>m.h).join('') : '<div class="empty-msg">Aucun mouvement sur vos favoris pour le moment.</div>')
+    + h('📈 Plus fortes hausses') + (top.join('') || '<div class="empty-msg">Pas encore de mouvements.</div>');
 }
 
 /* ============================================================================
