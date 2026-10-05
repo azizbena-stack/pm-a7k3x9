@@ -649,7 +649,8 @@ function openSearch(){
 let plMap = lsObj('pm_pl'), plOpen = null;
 function plSave(){ try{ localStorage.setItem('pm_pl',JSON.stringify(plMap)); }catch(e){} }
 function renderPlaylists(){
-  const head = `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Playlists</div></div></div>` + (isPro() ? '' : `<div class="hpad" style="margin:10px 0;"><button class="btn btn-primary btn-block" data-action="open-paywall">🔓 Débloquer PRO DJ</button></div>`);
+  const head = `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Playlists</div></div></div>`;
+  if(!isPro()) return head + `<div class="hpad" style="margin-top:40px;"><div class="card" style="text-align:center;"><div style="font-size:34px;">🎵🔒</div><h3 style="margin:10px 0 6px;">Playlists réservées aux membres Premium</h3><p style="color:var(--text-muted);font-size:12.5px;line-height:1.6;">Créez vos playlists et ajoutez-y vos morceaux préférés.</p><button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="open-paywall">🔓 Débloquer Premium</button></div></div>`;
   if(plOpen && plMap[plOpen]){
     const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div><span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
     return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
@@ -714,7 +715,7 @@ function realChartPlatformTabsHTML(action, selected){
     ${PLATFORMS_UI.map(p=>`<button class="${p===selected?'active':''}" data-action="${action}" data-p="${p}">${PLATFORM_LABEL[p]}</button>`).join('')}
   </div>`;
 }
-// Bouton PRO placé juste là où le flou commence (pas besoin de descendre en bas) : lignes gratuites, bouton, puis toutes les lignes floutées jusqu'au 100e.
+// Bouton Premium placé juste là où le flou commence (pas besoin de descendre en bas) : lignes gratuites, bouton, puis toutes les lignes floutées jusqu'au 100e.
 function lockBannerHTML(){
   return `<div class="hpad" style="margin:10px 0;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>`;
 }
@@ -1282,13 +1283,13 @@ const I18N = {
     'home.trendingNow': `🔥 Trending Now`,
     'home.topGlobal': `GLOBAL TOP 100`,
     'home.topPrefix': `TOP`,
-    'home.pro': `Pro ↗`,
-    'home.unlockTop100': `🔓 Débloquer le Top 100 complet — PRO DJ`,
+    'home.pro': `Premium ↗`,
+    'home.unlockTop100': `🔓 Débloquer le Top 100 complet — Premium`,
     'nextbig.title': `NEXT BIG TRACKS`,
     'nextbig.subtitle': `DÉTECTION PRÉCOCE`,
-    'nextbig.proOnlyTitle': `Réservé aux DJs Pro`,
+    'nextbig.proOnlyTitle': `Réservé aux membres Premium`,
     'nextbig.proOnlyDesc': `Découvre les morceaux qui explosent avant tout le monde, avant qu'ils deviennent des hits mondiaux.`,
-    'nextbig.unlockPro': `Débloquer avec PRO`,
+    'nextbig.unlockPro': `Débloquer avec Premium`,
     'nextbig.empty': `Aucun morceau émergent pour ce filtre pour le moment.`,
     'nextbig.days14': `en 14 jours`,
     'nextbig.djs': `DJs`,
@@ -1317,11 +1318,11 @@ const I18N = {
     'profile.soundcloud': `SoundCloud`,
     'profile.createButton': `Créer mon profil`,
     'profile.titleProfile': `PROFIL DJ`,
-    'profile.proDj': `PRO DJ`,
+    'profile.proDj': `Premium`,
     'profile.free': `FREE`,
-    'profile.goProTitle': `⭐ Passe PRO DJ`,
+    'profile.goProTitle': `⭐ Passe Premium`,
     'profile.goProDesc': `Top 100 complet, Next Big Tracks, historique 90 jours, alertes illimitées, My Radar complet.`,
-    'profile.viewProOffer': `Voir l'offre PRO`,
+    'profile.viewProOffer': `Voir l'offre Premium`,
     'profile.topPlayed': `Top morceaux joués`,
     'profile.similarDjs': `DJs au style similaire`,
     'profile.noMatch': `Pas encore de correspondance.`,
@@ -1381,12 +1382,12 @@ const I18N = {
     'genreSheet.apply': `Appliquer`,
     'paywall.perMonth': `/mois`,
     'paywall.orYearly': `ou 39,99&nbsp;€/an — soit 3,33&nbsp;€/mois (-33%)`,
-    'paywall.activate': `Activer PRO (démo)`,
+    'paywall.activate': `Activer Premium (démo)`,
     'paywall.later': `Plus tard`,
     'paywall.labelOffer': `Offre Label/Artiste avec analytics avancés disponible sur demande.`,
     'paywall.f1': `Top 100 complet`, 'paywall.f2': `Tous les genres, pays &amp; villes`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `Historique 90 jours`, 'paywall.f5': `Alertes illimitées`, 'paywall.f6': `My Radar complet`, 'paywall.f7': `Statistiques avancées`,
     'toast.addedToRadar': `Ajouté à ton Radar 📡`,
-    'toast.proActivated': `🎉 PRO DJ activé (démo) — tout est débloqué !`,
+    'toast.proActivated': `🎉 Premium activé (démo) — tout est débloqué !`,
     'toast.profileCreated': `Profil DJ créé ✅`,
     'toast.openingOn': `Ouverture sur {p}…`,
     'toast.noPreview': `Aucun extrait audio réel disponible pour ce morceau`,
@@ -1436,13 +1437,13 @@ const I18N = {
     'home.trendingNow': `🔥 Trending Now`,
     'home.topGlobal': `GLOBAL TOP 100`,
     'home.topPrefix': `TOP`,
-    'home.pro': `Pro ↗`,
-    'home.unlockTop100': `🔓 Unlock the full Top 100 — PRO DJ`,
+    'home.pro': `Premium ↗`,
+    'home.unlockTop100': `🔓 Unlock the full Top 100 — Premium`,
     'nextbig.title': `NEXT BIG TRACKS`,
     'nextbig.subtitle': `EARLY DETECTION`,
-    'nextbig.proOnlyTitle': `Pro DJs only`,
+    'nextbig.proOnlyTitle': `Premium members only`,
     'nextbig.proOnlyDesc': `Discover tracks exploding before everyone else, before they become global hits.`,
-    'nextbig.unlockPro': `Unlock with PRO`,
+    'nextbig.unlockPro': `Unlock with Premium`,
     'nextbig.empty': `No emerging tracks for this filter right now.`,
     'nextbig.days14': `in 14 days`,
     'nextbig.djs': `DJs`,
@@ -1471,11 +1472,11 @@ const I18N = {
     'profile.soundcloud': `SoundCloud`,
     'profile.createButton': `Create my profile`,
     'profile.titleProfile': `DJ PROFILE`,
-    'profile.proDj': `PRO DJ`,
+    'profile.proDj': `Premium`,
     'profile.free': `FREE`,
-    'profile.goProTitle': `⭐ Go PRO DJ`,
+    'profile.goProTitle': `⭐ Go Premium`,
     'profile.goProDesc': `Full Top 100, Next Big Tracks, 90-day history, unlimited alerts, full My Radar.`,
-    'profile.viewProOffer': `See the PRO offer`,
+    'profile.viewProOffer': `See the Premium offer`,
     'profile.topPlayed': `Most played tracks`,
     'profile.similarDjs': `DJs with a similar style`,
     'profile.noMatch': `No match yet.`,
@@ -1535,12 +1536,12 @@ const I18N = {
     'genreSheet.apply': `Apply`,
     'paywall.perMonth': `/month`,
     'paywall.orYearly': `or €39.99/year — i.e. €3.33/month (-33%)`,
-    'paywall.activate': `Activate PRO (demo)`,
+    'paywall.activate': `Activate Premium (demo)`,
     'paywall.later': `Later`,
     'paywall.labelOffer': `Label/Artist offer with advanced analytics available on request.`,
     'paywall.f1': `Full Top 100`, 'paywall.f2': `All genres, countries &amp; cities`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `90-day history`, 'paywall.f5': `Unlimited alerts`, 'paywall.f6': `Full My Radar`, 'paywall.f7': `Advanced stats`,
     'toast.addedToRadar': `Added to your Radar 📡`,
-    'toast.proActivated': `🎉 PRO DJ activated (demo) — everything is unlocked!`,
+    'toast.proActivated': `🎉 Premium activated (demo) — everything is unlocked!`,
     'toast.profileCreated': `DJ profile created ✅`,
     'toast.openingOn': `Opening on {p}…`,
     'toast.noPreview': `No real audio preview available for this track`,
@@ -1590,13 +1591,13 @@ const I18N = {
     'home.trendingNow': `🔥 Tendencias`,
     'home.topGlobal': `TOP 100 GLOBAL`,
     'home.topPrefix': `TOP`,
-    'home.pro': `Pro ↗`,
-    'home.unlockTop100': `🔓 Desbloquear el Top 100 completo — PRO DJ`,
+    'home.pro': `Premium ↗`,
+    'home.unlockTop100': `🔓 Desbloquear el Top 100 completo — Premium`,
     'nextbig.title': `PRÓXIMOS HITS`,
     'nextbig.subtitle': `DETECCIÓN TEMPRANA`,
-    'nextbig.proOnlyTitle': `Solo para DJs Pro`,
+    'nextbig.proOnlyTitle': `Solo para miembros Premium`,
     'nextbig.proOnlyDesc': `Descubre los temas que explotan antes que nadie, antes de que se conviertan en hits mundiales.`,
-    'nextbig.unlockPro': `Desbloquear con PRO`,
+    'nextbig.unlockPro': `Desbloquear con Premium`,
     'nextbig.empty': `No hay temas emergentes para este filtro por ahora.`,
     'nextbig.days14': `en 14 días`,
     'nextbig.djs': `DJs`,
@@ -1625,11 +1626,11 @@ const I18N = {
     'profile.soundcloud': `SoundCloud`,
     'profile.createButton': `Crear mi perfil`,
     'profile.titleProfile': `PERFIL DJ`,
-    'profile.proDj': `PRO DJ`,
+    'profile.proDj': `Premium`,
     'profile.free': `FREE`,
-    'profile.goProTitle': `⭐ Pásate a PRO DJ`,
+    'profile.goProTitle': `⭐ Pásate a Premium`,
     'profile.goProDesc': `Top 100 completo, Próximos Hits, historial de 90 días, alertas ilimitadas, Radar completo.`,
-    'profile.viewProOffer': `Ver la oferta PRO`,
+    'profile.viewProOffer': `Ver la oferta Premium`,
     'profile.topPlayed': `Temas más escuchados`,
     'profile.similarDjs': `DJs con estilo similar`,
     'profile.noMatch': `Aún no hay coincidencias.`,
@@ -1689,12 +1690,12 @@ const I18N = {
     'genreSheet.apply': `Aplicar`,
     'paywall.perMonth': `/mes`,
     'paywall.orYearly': `o 39,99&nbsp;€/año — 3,33&nbsp;€/mes (-33%)`,
-    'paywall.activate': `Activar PRO (demo)`,
+    'paywall.activate': `Activar Premium (demo)`,
     'paywall.later': `Más tarde`,
     'paywall.labelOffer': `Oferta Sello/Artista con analíticas avanzadas disponible bajo petición.`,
     'paywall.f1': `Top 100 completo`, 'paywall.f2': `Todos los géneros, países &amp; ciudades`, 'paywall.f3': `🚀 Próximos Hits`, 'paywall.f4': `Historial de 90 días`, 'paywall.f5': `Alertas ilimitadas`, 'paywall.f6': `Radar completo`, 'paywall.f7': `Estadísticas avanzadas`,
     'toast.addedToRadar': `Añadido a tu Radar 📡`,
-    'toast.proActivated': `🎉 PRO DJ activado (demo) — ¡todo desbloqueado!`,
+    'toast.proActivated': `🎉 Premium activado (demo) — ¡todo desbloqueado!`,
     'toast.profileCreated': `Perfil DJ creado ✅`,
     'toast.openingOn': `Abriendo en {p}…`,
     'toast.noPreview': `No hay extracto de audio real disponible para este tema`,
@@ -1744,13 +1745,13 @@ const I18N = {
     'home.trendingNow': `🔥 Im Trend`,
     'home.topGlobal': `GLOBALE TOP 100`,
     'home.topPrefix': `TOP`,
-    'home.pro': `Pro ↗`,
-    'home.unlockTop100': `🔓 Komplette Top 100 freischalten — PRO DJ`,
+    'home.pro': `Premium ↗`,
+    'home.unlockTop100': `🔓 Komplette Top 100 freischalten — Premium`,
     'nextbig.title': `NEXT BIG TRACKS`,
     'nextbig.subtitle': `FRÜHERKENNUNG`,
-    'nextbig.proOnlyTitle': `Nur für Pro-DJs`,
+    'nextbig.proOnlyTitle': `Nur für Premium-Mitglieder`,
     'nextbig.proOnlyDesc': `Entdecke Tracks, die durchstarten, bevor sie zu weltweiten Hits werden.`,
-    'nextbig.unlockPro': `Mit PRO freischalten`,
+    'nextbig.unlockPro': `Mit Premium freischalten`,
     'nextbig.empty': `Für diesen Filter gibt es derzeit keine aufstrebenden Tracks.`,
     'nextbig.days14': `in 14 Tagen`,
     'nextbig.djs': `DJs`,
@@ -1779,11 +1780,11 @@ const I18N = {
     'profile.soundcloud': `SoundCloud`,
     'profile.createButton': `Mein Profil erstellen`,
     'profile.titleProfile': `DJ-PROFIL`,
-    'profile.proDj': `PRO DJ`,
+    'profile.proDj': `Premium`,
     'profile.free': `FREE`,
-    'profile.goProTitle': `⭐ Werde PRO DJ`,
+    'profile.goProTitle': `⭐ Werde Premium`,
     'profile.goProDesc': `Komplette Top 100, Next Big Tracks, 90-Tage-Verlauf, unbegrenzte Meldungen, komplettes My Radar.`,
-    'profile.viewProOffer': `PRO-Angebot ansehen`,
+    'profile.viewProOffer': `Premium-Angebot ansehen`,
     'profile.topPlayed': `Meistgespielte Tracks`,
     'profile.similarDjs': `DJs mit ähnlichem Stil`,
     'profile.noMatch': `Noch keine Übereinstimmung.`,
@@ -1843,12 +1844,12 @@ const I18N = {
     'genreSheet.apply': `Anwenden`,
     'paywall.perMonth': `/Monat`,
     'paywall.orYearly': `oder 39,99&nbsp;€/Jahr — also 3,33&nbsp;€/Monat (-33%)`,
-    'paywall.activate': `PRO aktivieren (Demo)`,
+    'paywall.activate': `Premium aktivieren (Demo)`,
     'paywall.later': `Später`,
     'paywall.labelOffer': `Label-/Künstlerangebot mit erweiterten Analytics auf Anfrage erhältlich.`,
     'paywall.f1': `Komplette Top 100`, 'paywall.f2': `Alle Genres, Länder &amp; Städte`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `90-Tage-Verlauf`, 'paywall.f5': `Unbegrenzte Meldungen`, 'paywall.f6': `Komplettes My Radar`, 'paywall.f7': `Erweiterte Statistiken`,
     'toast.addedToRadar': `Zu deinem Radar hinzugefügt 📡`,
-    'toast.proActivated': `🎉 PRO DJ aktiviert (Demo) — alles freigeschaltet!`,
+    'toast.proActivated': `🎉 Premium aktiviert (Demo) — alles freigeschaltet!`,
     'toast.profileCreated': `DJ-Profil erstellt ✅`,
     'toast.openingOn': `Öffne bei {p}…`,
     'toast.noPreview': `Kein echter Audio-Ausschnitt für diesen Track verfügbar`,
@@ -2448,8 +2449,8 @@ function noPreviewHTML(){
       <a style="${b}" href="https://www.beatport.com/search?q=${q}" target="_blank" rel="noopener">Beatport</a>
     </div></div>`;
 }
-/* ---------------------------- SOURCE DE LECTURE (PRO) ----------------------------
-   Gratuit : extrait Apple Music de 30 s dans l'app. PRO : choix Apple Music / Spotify / YouTube.
+/* ---------------------------- SOURCE DE LECTURE (Premium) ----------------------------
+   Gratuit : extrait Apple Music de 30 s dans l'app. Premium : choix Apple Music / Spotify / YouTube.
    Spotify et YouTube se lisent dans l'app quand l'identifiant du morceau est connu, sinon la recherche s'ouvre sur le service. */
 const PLAY_SOURCE_KEY = 'pulse_play_source';
 function getPlaySource(){
@@ -2466,7 +2467,7 @@ function externalSearchUrl(p, t){
     SoundCloud: 'https://soundcloud.com/search?q='+q,
   })[p];
 }
-const lockedChoice = (label)=>`<button class="btn btn-outline btn-block" style="text-align:left;display:block;opacity:.8;" data-action="open-paywall">${label} 🔒 PRO<div style="font-size:10.5px;font-weight:600;color:var(--text-muted);margin-top:2px;">Réservé à la version PRO</div></button>`;
+const lockedChoice = (label)=>`<button class="btn btn-outline btn-block" style="text-align:left;display:block;opacity:.8;" data-action="open-paywall">${label} 🔒 Premium<div style="font-size:10.5px;font-weight:600;color:var(--text-muted);margin-top:2px;">Réservé à la version Premium</div></button>`;
 function openPlayChoice(id){
   const t = TRACKS.find(x=>x.id===id) || realTracksCache[id];
   if(!t) return;
@@ -2884,7 +2885,7 @@ function renderHome(){
   </div>
   <div class="hscroll">
     ${trending.map((t,i)=>`
-      ${!isPro()&&i===10?'<div class="next-card" style="flex:0 0 168px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;" data-action="open-paywall">🔓 Débloquer PRO</div>':''}<div class="next-card ${!isPro()&&i>=10?'lock-row':''}" style="flex:0 0 168px;" ${!isPro()&&i>=10?'':`data-action="open-track" data-id="${t.id}"`}>
+      ${!isPro()&&i===10?'<div class="next-card" style="flex:0 0 168px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;" data-action="open-paywall">🔓 Débloquer Premium</div>':''}<div class="next-card ${!isPro()&&i>=10?'lock-row':''}" style="flex:0 0 168px;" ${!isPro()&&i>=10?'':`data-action="open-track" data-id="${t.id}"`}>
         <div class="glow"></div>
         ${coverHTML(t,false)}
         <div style="font-weight:700;font-size:12.5px;margin-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.title)}</div>
@@ -3595,7 +3596,7 @@ function openPaywall(){
     <div class="sheet-inner">
       <div style="text-align:center;">
         <div style="font-size:30px;">⭐</div>
-        <h3 style="margin:8px 0 4px;">PRO DJ</h3>
+        <h3 style="margin:8px 0 4px;">Premium</h3>
         <div style="font-size:22px;font-weight:800;">4,99&nbsp;€<span style="font-size:12px;color:var(--text-muted);font-weight:600;">${tr('paywall.perMonth')}</span></div>
         <div style="font-size:11px;color:var(--good-text);font-weight:700;margin-top:3px;">${tr('paywall.orYearly')}</div>
       </div>
@@ -3875,7 +3876,7 @@ document.addEventListener('click', async (e)=>{
   else if(a==='pl-back'){ plOpen=null; renderView(); }
   else if(a==='pl-del'){ delete plMap[plOpen]; plOpen=null; plSave(); renderView(); }
   else if(a==='pl-rm'){ plMap[plOpen].splice(+el.dataset.i,1); plSave(); renderView(); }
-  else if(a==='add-pl'){ openAddPl(el.dataset.id); }
+  else if(a==='add-pl'){ if(!isPro()) openPaywall(); else openAddPl(el.dataset.id); }
   else if(a==='pl-add'){ addToPl(el.dataset.id, el.dataset.n); }
   else if(a==='toggle-heart'){ toggleHeart(el.dataset.id); }
   else if(a==='open-search'){ openSearch(); }
