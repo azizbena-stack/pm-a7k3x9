@@ -649,7 +649,7 @@ function openSearch(){
 let plMap = lsObj('pm_pl'), plOpen = null;
 function plSave(){ try{ localStorage.setItem('pm_pl',JSON.stringify(plMap)); }catch(e){} }
 function renderPlaylists(){
-  const head = `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Playlists</div></div></div>`;
+  const head = `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Playlists</div></div></div>` + (isPro() ? '' : `<div class="hpad" style="margin:10px 0;"><button class="btn btn-primary btn-block" data-action="open-paywall">🔓 Débloquer PRO DJ</button></div>`);
   if(plOpen && plMap[plOpen]){
     const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div><span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
     return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
@@ -2275,6 +2275,7 @@ function itStorePut(t, hit){
   const ks = Object.keys(itStore); if(ks.length>1500) delete itStore[ks[0]];
   try{ localStorage.setItem(IT_STORE_KEY, JSON.stringify(itStore)); }catch(e){}
 }
+const artOnly = {}; // pochettes Apple sans extrait audio (covers.json : p vide)
 const coverMiss = new Set(); let itBackoffUntil = 0; let coverUsedNet = false;
 /* covers.json : pochettes et extraits Apple préparés à l'avance pour les classements par genre (script build_covers.py).
    Aucune requête Apple n'est alors nécessaire pour ces morceaux, ni pour les afficher ni pour les écouter. */
@@ -2282,7 +2283,7 @@ const coversReady = (async()=>{
   try{
     const r = await fetch('covers.json'); if(!r.ok) return;
     const d = await r.json(); const now = Date.now();
-    for(const [k,v] of Object.entries(d)){ if(v && v.p) itStore[k] = { p:v.p, v:v.v||null, a:v.a||null, t:now }; else coverMiss.add(k); }
+    for(const [k,v] of Object.entries(d)){ if(v && v.p) itStore[k] = { p:v.p, v:v.v||null, a:v.a||null, t:now }; else { if(v && v.a) artOnly[k] = v.a; coverMiss.add(k); } }
   }catch(e){ /* fichier absent : on retombe sur la recherche Apple à la demande */ }
 })();
 // Une seule requête par morceau (pas la recherche en 5 essais réservée au clic sur Play).
@@ -2522,13 +2523,13 @@ function applyStoredCovers(){
     if(el.querySelector('img')) return;
     const t = realTracksCache[el.dataset.lazycover] || TRACKS.find(x=>x.id===el.dataset.lazycover);
     if(!t) return;
-    const sh = itStoreGet(t);
-    if(!sh || !sh.artwork) return;
-    t.coverUrl = sh.artwork;
+    const sh = itStoreGet(t), art = (sh && sh.artwork) || artOnly[itKey(t)];
+    if(!art) return;
+    t.coverUrl = art;
     const img = new Image(); img.alt=''; img.referrerPolicy='no-referrer';
     img.style.cssText='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;';
     img.onload = ()=>{ if(el.isConnected && !el.querySelector('img')) el.insertBefore(img, el.firstChild); };
-    img.src = sh.artwork;
+    img.src = art;
   });
 }
 coversReady.then(applyStoredCovers);
