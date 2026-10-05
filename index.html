@@ -636,7 +636,11 @@ async function renderSearch(){
   let list;
   if(searchFav) list = Object.values(favMap).map(f=>({title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}));
   else if(!words.length){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre.</div>'; return; }
-  else { host.innerHTML = '<div class="empty-msg">Recherche…</div>'; const idx = await loadSearchIndex(); list = idx.filter(r=>words.every(w=>r.q.includes(w))).slice(0,50); }
+  else { host.innerHTML = '<div class="empty-msg">Recherche…</div>'; const idx = await loadSearchIndex(); list = idx.filter(r=>words.every(w=>r.q.includes(w))).slice(0,50);
+    // un genre tapé (house, techno, indie dance…) : on ajoute le haut de son classement
+    const rows = await loadRadarRows(), gk = genreKeysFor(words, rows), per = gk.length>2 ? 10 : 30, seen = new Set();
+    list = [...gk.flatMap(k=>genreTop(rows,k,per)).map(r=>({title:r.title, artist_name:r.artist, cover_url:r.cover, youtube_id:null})), ...list]
+      .filter(t=>{ const k = coreTitle(t.title)+'|'+normText(t.artist_name); return !seen.has(k) && seen.add(k); }).slice(0,60); }
   host.innerHTML = list.length ? list.map((tr_,i)=>renderRealTrackRow({rank:i+1, previous_rank:null, tracks:tr_}, i, false)).join('') : '<div class="empty-msg">Aucun résultat.</div>';
 }
 function openSearch(){
@@ -3259,6 +3263,11 @@ function loadRadarRows(){
     return out;
   })());
 }
+function genreKeysFor(words, rows){
+  if(!words.length || words.some(w=>w.length<3)) return [];
+  return [...new Set(rows.filter(r=>r.kind==='g').map(r=>r.key))].filter(k=>{ const l = normText(RADAR_GENRE[k]||(genreById(k)||{}).name||k.replace(/-/g,' ')); return words.every(w=>l.includes(w)); });
+}
+const genreTop = (rows, k, n) => rows.filter(r=>r.kind==='g' && r.key===k).sort((a,b)=>a.rank-b.rank).slice(0,n);
 const radarWhere = r => r.kind==='g' ? '🎧 '+(RADAR_GENRE[r.key]||(genreById(r.key)||{}).name||r.key) : '🌍 '+cname(r.key);
 function radarMatch(rows, title, artist){
   const ct = coreTitle(title), w = sigWords(artist,2);
@@ -3301,11 +3310,12 @@ async function renderRadarSearch(){
   if(!words.length){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre pour voir où il est classé.</div>'; return; }
   const rows = await loadRadarRows();
   if(!document.getElementById('radarBody') || normText(inp.value).split(' ').filter(Boolean).join(' ')!==words.join(' ')) return;
-  const uniq = new Map();
+  const uniq = new Map(), h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
   rows.forEach(r=>{ if(words.every(w=>r.q.includes(w))){ const k = r.ct+'|'+normText(r.artist.split(/[,&]/)[0]); if(!uniq.has(k)) uniq.set(k,r); } });
   const list = [...uniq.values()].slice(0,30);
-  const h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
-  host.innerHTML = h('🏆 Dans nos classements') + (list.length ? list.map((r,i)=>radarCard(r.title, r.artist, r.cover, radarMatch(rows,r.title,r.artist), i)).join('') : '<div class="empty-msg">Aucun résultat dans nos classements.</div>')
+  const gk = genreKeysFor(words, rows), per = gk.length>2 ? 10 : 30;
+  const genreHTML = gk.map(k=>{ const g = genreTop(rows,k,per); return h('🎧 '+esc(radarWhere(g[0]).slice(3)))+g.map((r,i)=>radarCard(r.title, r.artist, r.cover, radarMatch(rows,r.title,r.artist), i)).join(''); }).join('');
+  host.innerHTML = genreHTML + h('🏆 Dans nos classements') + (list.length ? list.map((r,i)=>radarCard(r.title, r.artist, r.cover, radarMatch(rows,r.title,r.artist), i)).join('') : '<div class="empty-msg">Aucun résultat dans nos classements.</div>')
     + h('🍎 Catalogue Apple Music') + '<div id="radarApple"><div class="empty-msg">Recherche…</div></div>';
   clearTimeout(radarAppleTimer);
   const q = inp.value.trim();
