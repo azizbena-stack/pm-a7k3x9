@@ -3287,6 +3287,7 @@ function radarCard(title, artist, cover, ms, i, note){
   return `<div>${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title, artist_name:artist, cover_url:cover, youtube_id:null}}, i, false)}<div class="chiprow" style="padding:0 18px 10px;flex-wrap:wrap;overflow:visible;">${chips}</div></div>`;
 }
 function renderRadar(){
+  if(state.radarArtist) return `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>📊 ${esc(state.radarArtist)}</div><button class="icon-btn" data-action="radar-back">← Retour</button></div></div><div id="radarBody"><div class="empty-msg">Chargement…</div></div><div style="height:10px;"></div>`;
   const n = Object.keys(favMap).length, t = state.radarTab;
   const tab = (k,l)=>`<div class="chip ${t===k?'active':''}" data-action="radar-tab" data-t="${k}">${l}</div>`;
   return `
@@ -3299,12 +3300,81 @@ function renderRadar(){
   <div style="height:10px;"></div>`;
 }
 async function loadRadar(){
+  if(state.radarArtist){ loadArtistStats(); return; }
   const t = state.radarTab;
   if(t==='search'){ renderRadarSearch(); return; }
   const rows = await loadRadarRows(), host = document.getElementById('radarBody');
   if(!host || state.view!=='radar' || state.radarTab!==t) return;
   host.innerHTML = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
 }
+/* ---------------------------- STATISTIQUES ARTISTE (gratuit) ----------------------------
+   Présence dans nos classements (genres + pays, positions, mouvements) + catalogue public Apple Music
+   (nombre de titres, sorties par année, genres, dernières sorties). Écoutes/followers : nécessiteraient une API payante. */
+const statTile = (v,l)=>`<div style="flex:1 1 30%;min-width:96px;background:var(--card-2);border:1px solid var(--border-soft);border-radius:14px;padding:12px 8px;text-align:center;"><div class="tabular" style="font-size:20px;font-weight:800;">${v}</div><div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">${l}</div></div>`;
+let worldP = null;
+const fetchWorld = () => worldP || (worldP = fetch('world.json').then(r=>r.ok?r.json():null).catch(()=>null).then(w=>{ if(!w) worldP = null; return w; }));
+// Carte du monde : indice de présence = somme de (101 - place) des titres de l'artiste dans le classement électro de chaque pays, ramené à 100 pour le pays n°1.
+// Ce n'est PAS un nombre d'écoutes (donnée payante) : seuls les pays dont on synchronise le classement sont colorés.
+function worldMapHTML(world, mine){
+  const sc = {}, best = {}, cnt = {};
+  mine.filter(r=>r.kind==='c').forEach(r=>{ sc[r.key] = (sc[r.key]||0) + 101 - r.rank; best[r.key] = Math.min(best[r.key]||999, r.rank); cnt[r.key] = (cnt[r.key]||0)+1; });
+  const max = Math.max(1, ...Object.values(sc)), idx = c => Math.round(100*(sc[c]||0)/max);
+  const col = v => !v ? '#3a3a52' : v>75 ? '#a78bfa' : v>50 ? '#7c5cff' : v>25 ? '#5b3fd6' : '#3d2a9c';
+  const svg = world ? `<svg viewBox="0 0 720 282" width="100%" style="display:block;background:#12121a;border-radius:14px;">${Object.entries(world).map(([k,d])=>`<path d="${d}" fill="${col(idx(k))}" stroke="${sc[k]?'#fff':'#0a0a0f'}" stroke-width="${sc[k]?1.2:.4}"><title>${sc[k] ? esc(cname(k))+' : indice '+idx(k)+' · meilleure place #'+best[k] : esc(k.length===2 ? cname(k) : '')}</title></path>`).join('')}</svg>` : '<div class="empty-msg">Carte indisponible pour le moment.</div>';
+  const list = Object.keys(sc).sort((a,b)=>sc[b]-sc[a]).slice(0,10);
+  const legend = `<div style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-muted);margin-top:8px;">faible ${['#3d2a9c','#5b3fd6','#7c5cff','#a78bfa'].map(c=>`<span style="width:22px;height:8px;border-radius:3px;background:${c};"></span>`).join('')} fort · <span style="width:22px;height:8px;border-radius:3px;background:#3a3a52;"></span> aucun classement</div>`;
+  return `<div class="hpad">${svg}${legend}</div>`
+    + (list.length ? list.map(c=>`<div class="alert-item"><div class="aic">${(countryByCode(c)||{}).flag||'🌍'}</div><div style="flex:1;"><div class="at">${esc(cname(c))} · indice ${idx(c)}</div><div class="ad">${cnt[c]} titre(s) · meilleure place #${best[c]}</div><div style="height:5px;border-radius:3px;background:var(--card-2);margin-top:5px;"><div style="height:5px;border-radius:3px;background:#7c5cff;width:${idx(c)}%;"></div></div></div></div>`).join('') : '<div class="empty-msg">Aucun classement de pays ne contient cet artiste pour le moment.</div>')
+    + '<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.5;">Indice de présence dans les classements électro par pays (pas un nombre d\'écoutes). Les écoutes réelles par pays demandent une source de données payante.</div>';
+}
+const artistCatCache = new Map();
+async function fetchArtistCatalog(name){
+  if(artistCatCache.has(name)) return artistCatCache.get(name);
+  try{
+    const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(name)}&media=music&entity=song&attribute=artistTerm&limit=200`);
+    if(!res.ok) return null;
+    const d = await res.json(), nn = normText(name), seen = new Set();
+    const list = (d.results||[]).filter(x=>{ if(!x.trackName || !normText(x.artistName).includes(nn)) return false; const k = coreTitle(x.trackName)+'|'+normText(x.artistName); return !seen.has(k) && seen.add(k); });
+    artistCatCache.set(name, list); return list;
+  }catch(e){ return null; }
+}
+function openArtistStats(name){
+  const ov = document.getElementById('searchOv'); if(ov) ov.classList.add('hidden');
+  state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; renderView();
+}
+async function loadArtistStats(){
+  const name = state.radarArtist;
+  const [rows, cat, world] = await Promise.all([loadRadarRows(), fetchArtistCatalog(name), fetchWorld()]);
+  const host = document.getElementById('radarBody');
+  if(!host || state.radarArtist!==name) return;
+  const nn = normText(name), mine = rows.filter(r=>r.na.includes(nn));
+  const h = t=>`<div class="section-title"><h2>${t}</h2></div>`, tiles = a=>`<div class="hpad" style="display:flex;flex-wrap:wrap;gap:8px;">${a.join('')}</div>`;
+  const ranks = mine.map(r=>r.rank);
+  let out = h('🏆 Dans nos classements');
+  if(!mine.length) out += '<div class="empty-msg">Aucun titre de cet artiste dans les classements actuels (genres et pays).</div>';
+  else {
+    const g = new Set(mine.filter(r=>r.kind==='g').map(r=>r.key)), c = new Set(mine.filter(r=>r.kind==='c').map(r=>r.key));
+    out += tiles([statTile(new Set(mine.map(r=>r.ct)).size,'titres classés'), statTile(g.size,'genres'), statTile(c.size,'pays'), statTile('#'+Math.min(...ranks),'meilleure place'), statTile(Math.round(ranks.reduce((a,b)=>a+b,0)/ranks.length),'place moyenne'), statTile(mine.filter(r=>r.prev!=null && r.prev>r.rank).length,'en hausse')])
+      + h('📍 Où il est classé') + mine.slice().sort((a,b)=>a.rank-b.rank).slice(0,15).map(r=>`<div class="alert-item"><div class="aic">${r.kind==='g'?'🎧':'🌍'}</div><div><div class="at">${esc(r.title)}</div><div class="ad">${esc(radarWhere(r).slice(3))} · #${r.rank} ${realTrackMoveHTML(r.rank,r.prev)}</div></div></div>`).join('');
+  }
+  out += h('🗺️ Où il est écouté') + worldMapHTML(world, mine);
+  out += h('🍎 Catalogue Apple Music');
+  if(cat===null) out += '<div class="empty-msg">Catalogue Apple indisponible pour le moment, réessayez dans une minute.</div>';
+  else if(!cat.length) out += '<div class="empty-msg">Aucun titre trouvé sur Apple Music.</div>';
+  else {
+    const yr = {}, gen = {}; cat.forEach(x=>{ const y = (x.releaseDate||'').slice(0,4); if(y) yr[y] = (yr[y]||0)+1; if(x.primaryGenreName) gen[x.primaryGenreName] = (gen[x.primaryGenreName]||0)+1; });
+    const years = Object.keys(yr).sort(), max = Math.max(...Object.values(yr)), topG = Object.entries(gen).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]).join(', ');
+    const latest = cat.slice().sort((a,b)=>(b.releaseDate||'').localeCompare(a.releaseDate||''));
+    out += tiles([statTile(cat.length>=190?'200+':cat.length,'titres'), statTile(new Set(cat.map(x=>x.collectionName)).size,'sorties'), statTile(years[0]||'–','première sortie'), statTile((latest[0].releaseDate||'').slice(0,7)||'–','dernière sortie')])
+      + (topG ? `<div class="hpad" style="font-size:11.5px;color:var(--text-muted);margin-top:8px;">Genres Apple : ${esc(topG)}</div>` : '')
+      + h('📅 Titres par année') + `<div class="hpad" style="display:flex;align-items:flex-end;gap:5px;height:90px;">${years.map(y=>`<div style="flex:1;text-align:center;font-size:9px;color:var(--text-muted);"><div style="background:#7c5cff;border-radius:4px 4px 0 0;height:${Math.max(4,Math.round(yr[y]/max*62))}px;"></div>${y.slice(2)}</div>`).join('')}</div>`
+      + h('🆕 Dernières sorties') + latest.slice(0,5).map((x,i)=>{ const art = (x.artworkUrl100||'').replace('100x100','300x300')||null; if(x.previewUrl) itStore[itKey({title:x.trackName, artist:x.artistName})] = { p:x.previewUrl, v:x.trackViewUrl||null, a:art, t:Date.now() }; return radarCard(x.trackName, x.artistName, art, radarMatch(rows,x.trackName,x.artistName), i, esc((x.releaseDate||'').slice(0,10))); }).join('');
+  }
+  out += h('🔗 Voir l\'artiste') + `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;">${platformLinks(name, cat && cat[0] && cat[0].artistViewUrl)}</div>`
+    + '<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:14px;line-height:1.5;">Sources : classements Beatport / Apple Music via Soundcharts, catalogue public Apple Music (200 titres maximum). Écoutes et abonnés : bientôt, selon les accords de données.</div>';
+  host.innerHTML = out;
+}
+
 function radarSavedHTML(rows){
   const favs = Object.values(favMap);
   if(!favs.length) return `<div class="empty-msg">Aucun favori.<br>Touchez le ♡ sur un morceau pour le suivre ici : vous verrez dans quels classements il apparaît. 📡</div>`;
@@ -3344,7 +3414,7 @@ async function loadRadarApple(q, rows, inId, hostId){
   // artistes trouvés (nom contenant tous les mots tapés) avec leurs liens Apple Music / Spotify / Beatport
   const qw = normText(q).split(' ').filter(Boolean), arts = new Map();
   list.forEach(x=>{ const n = x.artistName.split(/\s*(?:,|&|feat\.?)\s*/i)[0].trim(); if(n && qw.every(w=>normText(n).includes(w)) && !arts.has(n)) arts.set(n, x.artistViewUrl); });
-  const artHTML = arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,4).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;">${platformLinks(n,u)}</div></div>`).join('') : '';
+  const artHTML = arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,4).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span>${platformLinks(n,u)}</div></div>`).join('') : '';
   host.innerHTML = (artHTML || fallbackLinks(q)) + (list.length ? list.map((x,i)=>{
     const art = (x.artworkUrl100||'').replace('100x100','300x300') || null;
     if(x.previewUrl) itStore[itKey({title:x.trackName, artist:x.artistName})] = { p:x.previewUrl, v:x.trackViewUrl||null, a:art, t:now };
@@ -4017,7 +4087,9 @@ document.addEventListener('click', async (e)=>{
     if(host && state.exploreOpenCityId) host.innerHTML = renderExploreDetail('city', state.exploreOpenCityId);
     if(state.exploreOpenCityId) loadExploreCityList(state.exploreOpenCityId);
   }
-  else if(a==='radar-tab'){ state.radarTab = el.dataset.t; renderView(); }
+  else if(a==='radar-tab'){ state.radarTab = el.dataset.t; state.radarArtist = null; renderView(); }
+  else if(a==='radar-back'){ state.radarArtist = null; renderView(); }
+  else if(a==='artist-stats'){ openArtistStats(el.dataset.n); }
   else if(a==='open-paywall'){ openPaywall(); }
   else if(a==='close-paywall'){ closePaywall(); }
   else if(a==='activate-pro'){
