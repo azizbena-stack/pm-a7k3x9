@@ -2846,7 +2846,6 @@ function renderHome(){
     <div class="brand-row">
       <div class="brand"><span class="dot"></span>Pulse Music<small>${tr('home.brandSmall')}</small></div>
       <button class="icon-btn" data-action="open-search">🔍</button>
-      <button class="icon-btn" data-action="nav" data-view="radar">🔔${state.favTracks.size? '<span class=\"badge-dot\"></span>':''}</button>
     </div>
     <div class="segmented">
       <button class="${state.scope==='world'?'active':''}" data-action="scope" data-scope="world">${tr('home.scopeWorld')}</button>
