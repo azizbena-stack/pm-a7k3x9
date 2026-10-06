@@ -3335,6 +3335,17 @@ function worldMapHTML(world, mine, real, pcol){
     + (real ? '' : list.length ? list.map(c=>`<div class="alert-item"><div class="aic">${flagOf(c)}</div><div style="flex:1;"><div class="at">${esc(real ? nm[c] : cname(c))} · ${real ? fmtNum(sc[c])+' auditeurs' : 'indice '+idx(c)}</div><div class="ad">${real ? esc(top[c]) : cnt[c]+' titre(s) · meilleure place #'+best[c]}</div><div style="height:5px;border-radius:3px;background:var(--card-2);margin-top:5px;"><div style="height:5px;border-radius:3px;background:${pcol};width:${idx(c)}%;"></div></div></div></div>`).join('') : '<div class="empty-msg">Aucun classement de pays ne contient cet artiste pour le moment.</div>')
     + `<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.5;">${real ? 'Auditeurs Spotify (28 jours) dans les 50 villes principales, regroupés par pays. Source : Soundcharts.' : 'Indice de présence dans les classements électro par pays (pas un nombre d\'écoutes).'}</div>`;
 }
+const RANGES = {'1m':30,'3m':90,'6m':180,'1a':365}, dAgo = n => new Date(Date.now()-n*86400000).toISOString().slice(0,10);
+const PNAME = {spotify:'Spotify',youtube:'YouTube',apple:'Apple Music','apple-music':'Apple Music',beatport:'Beatport',shazam:'Shazam',deezer:'Deezer',instagram:'Instagram',tiktok:'TikTok',soundcloud:'SoundCloud',twitter:'X',facebook:'Facebook',tidal:'Tidal',amazon:'Amazon',anghami:'Anghami',pandora:'Pandora',yandex:'Yandex',jiosaavn:'JioSaavn',kugou:'Kugou',lastfm:'Last.fm'};
+const pname = k => PNAME[k] || (k ? k[0].toUpperCase()+k.slice(1) : '');
+function rangeChips(){ const r = state.statsRange || '3m'; return `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;">${Object.keys(RANGES).map(k=>`<span class="chip ${k===r?'active':''}" data-action="stats-range" data-r="${k}">${k==='1a'?'1 an':k.replace('m',' mois')}</span>`).join('')}</div>`; }
+// courbe historique (pts = [{d:'YYYY-MM-DD', v:nombre}] triés par date)
+function lineChart(pts, color){
+  if(pts.length<2) return '<div class="empty-msg">Pas assez de relevés sur cette période.</div>';
+  const W = 320, H = 120, vs = pts.map(x=>x.v), mn = Math.min(...vs), mx = Math.max(...vs), sy = v => (mx===mn ? H/2 : H-18-(v-mn)/(mx-mn)*(H-34)).toFixed(1), sx = i => (8+i*(W-16)/(pts.length-1)).toFixed(1);
+  const line = pts.map((x,i)=>sx(i)+','+sy(x.v)).join(' ');
+  return `<div class="hpad"><svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;background:#12121a;border-radius:12px;"><polygon points="8,${H-18} ${line} ${W-8},${H-18}" fill="${color}" fill-opacity=".15"/><polyline points="${line}" fill="none" stroke="${color}" stroke-width="2"/><text x="8" y="${H-4}" font-size="9" fill="#8a8a9a">${pts[0].d}</text><text x="${W-8}" y="${H-4}" font-size="9" fill="#8a8a9a" text-anchor="end">${pts[pts.length-1].d}</text><text x="8" y="11" font-size="9" fill="#cfcfe0">max ${fmtNum(mx)}</text><text x="${W-8}" y="11" font-size="9" fill="#cfcfe0" text-anchor="end">dernier ${fmtNum(vs[vs.length-1])}</text></svg></div>`;
+}
 const scCache = new Map();
 // Lecture d'un point d'accès Soundcharts (liste blanche côté fonction) ; null si indisponible / non inclus dans le forfait.
 async function fetchSC(name, path){
@@ -3400,9 +3411,30 @@ async function loadArtistStats(){
   }
   // Fiche artiste (Soundcharts)
   const meta = await fetchSC(name, '/api/v2.9/artist/{uuid}'), mo = meta && meta.data && meta.data.object;
-  if(mo) out = `<div class="hpad" style="margin:10px 0;display:flex;gap:12px;align-items:center;">${mo.imageUrl ? `<img src="${esc(mo.imageUrl)}" alt="" referrerpolicy="no-referrer" style="width:64px;height:64px;border-radius:50%;object-fit:cover;">` : ''}<div style="min-width:0;"><div style="font-weight:800;font-size:15px;">${esc(mo.name)} ${mo.countryCode ? flagOf(mo.countryCode) : ''}</div><div style="font-size:11px;color:var(--text-muted);">${esc((mo.genres||[]).map(g=>g.root).filter(Boolean).join(' · '))}${mo.type ? ' · '+esc(mo.type) : ''}</div>${mo.biography ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;line-height:1.4;">${esc(mo.biography.slice(0,170))}${mo.biography.length>170?'…':''}</div>` : ''}</div></div>` + out;
+  const head = !mo ? '' : `<div class="hpad" style="margin:10px 0;display:flex;gap:12px;align-items:center;">${mo.imageUrl ? `<img src="${esc(mo.imageUrl)}" alt="" referrerpolicy="no-referrer" style="width:64px;height:64px;border-radius:50%;object-fit:cover;">` : ''}<div style="min-width:0;"><div style="font-weight:800;font-size:15px;">${esc(mo.name)} ${mo.countryCode ? flagOf(mo.countryCode) : ''}</div><div style="font-size:11px;color:var(--text-muted);">${esc((mo.genres||[]).map(g=>g.root).filter(Boolean).join(' · '))}${mo.type ? ' · '+esc(mo.type) : ''}</div>${mo.biography ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;line-height:1.4;">${esc(mo.biography.slice(0,170))}${mo.biography.length>170?'…':''}</div>` : ''}</div></div>`;
+  // Vue d'ensemble (Soundcharts « current/stats ») + fil d'activités
+  const [cs, ev1, ev2, ev3, ev4, ev5] = await Promise.all([fetchSC(name, '/api/v2/artist/{uuid}/current/stats'),
+    fetchSC(name, '/api/v2.20/artist/{uuid}/playlist/current/spotify?currentOnly=0&limit=15&sortBy=entryDate&sortOrder=desc'),
+    ...['spotify','apple-music','beatport','shazam'].map(c=>fetchSC(name, `/api/v2/artist/{uuid}/charts/song/ranks/${c}?currentOnly=0&limit=15&sortBy=rankDate&sortOrder=desc`))]);
+  let ov = '', ac = '';
+  const o = cs && cs.data;
+  if(o){
+    const T = (arr, lab, f) => (arr||[]).length ? `<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:10px 18px 4px;">${lab}</div>` + tiles(arr.map(f)) : '';
+    ov = h('📊 Vue d\'ensemble') + T(o.social, 'ABONNÉS', x=>statTile(fmtNum(x.value), pname(x.platform), x.evolution))
+      + T(o.streaming, 'ÉCOUTES / VUES (28 J)', x=>statTile(fmtNum(x.value), pname(x.platform), x.evolution))
+      + T(o.popularity, 'POPULARITÉ', x=>statTile(x.value+'/100', pname(x.platform), x.evolution))
+      + T(o.retention, 'ÉCOUTES PAR AUDITEUR', x=>statTile(x.value.toFixed(1), pname(x.platform)))
+      + T((o.score||[]).filter(x=>x.type), 'SCORE SOUNDCHARTS', x=>statTile(fmtNum(x.value), ({sc_score:'score',sc_fanbase:'fanbase',sc_trending:'tendance'})[x.type]||x.type, x.evolution))
+      + T(o.ranks, 'RANG D\'ARTISTE', x=>statTile('#'+fmtNum(x.position), (x.countryCode ? flagOf(x.countryCode)+' ' : '🌍 ')+(x.genre||'tous genres'), -x.positionEvolution));
+  }
+  const evs = [];
+  (ev1 ? ev1.data.items||[] : []).forEach(x=>evs.push({d:x.entryDate, i:'📻', t:'Ajouté à la playlist « '+x.playlist.name+' »', s:fmtNum(x.playlist.latestSubscriberCount)+' abonnés · '+x.song.name}));
+  [['spotify',ev2],['apple-music',ev3],['beatport',ev4],['shazam',ev5]].forEach(([pf2,e])=>(e ? e.data.items||[] : []).forEach(x=>evs.push({d:x.rankDate, i:'🏆', t:'#'+x.position+' · '+x.chart.name+(x.chart.cityName ? ' ('+x.chart.cityName+')' : x.chart.countryName ? ' ('+x.chart.countryName+')' : ''), s:pname(pf2)+' · '+x.song.name+(x.positionEvolution ? ' · '+(x.positionEvolution>0?'▲':'▼')+Math.abs(x.positionEvolution) : '')})));
+  evs.sort((a,b)=>String(b.d).localeCompare(String(a.d)));
+  if(evs.length) ac = h('🔔 Activités récentes') + evs.slice(0,15).map(x=>`<div class="alert-item"><div class="aic">${x.i}</div><div><div class="at">${esc(x.t)}</div><div class="ad">${esc(x.s)}</div><div class="atime">${esc(String(x.d).slice(0,10))}</div></div></div>`).join('');
+  out = head + ov + ac + out;
   const PF = {
-    spotify:['🟢 Spotify','#1db954',{chart:'spotify',pl:'spotify',st:'spotify'}], youtube:['🔴 YouTube','#ff3b3b',{pl:'youtube',st:'youtube',au:'youtube'}],
+    spotify:['🟢 Spotify','#1db954',{chart:'spotify',pl:'spotify',st:'spotify',au:'spotify'}], youtube:['🔴 YouTube','#ff3b3b',{pl:'youtube',st:'youtube',au:'youtube'}],
     apple:['🍎 Apple Music','#fa2d48',{chart:'apple-music',pl:'apple-music'}], beatport:['🟠 Beatport','#ff7a00',{chart:'beatport'}],
     shazam:['🔵 Shazam','#0a84ff',{chart:'shazam'}], deezer:['🟣 Deezer','#a238ff',{pl:'deezer',au:'deezer'}],
     instagram:['📸 Instagram','#e1306c',{au:'instagram'}], tiktok:['🎵 TikTok','#25c4ce',{au:'tiktok'}], soundcloud:['🟧 SoundCloud','#ff5500',{au:'soundcloud'}]
@@ -3425,17 +3457,18 @@ async function loadArtistStats(){
       cp.forEach(c=>{ const o = real[c.countryCode]; if(o && o.top.split(', ').filter(Boolean).length<3) o.top += (o.top ? ', ' : '') + c.cityName; });
       out += tiles([yt ? statTile(fmtNum(co.reduce((t,c)=>t+c.value,0)), 'vues (28 j)') : cur ? statTile(fmtNum(cur.value), 'auditeurs mensuels', wk ? cur.value-wk.value : 0, lst.slice(0,30).map(x=>x.value).reverse()) : '', statTile(co.length,'pays'), statTile(cp.length,'villes')])
         + `<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:6px;">Données Soundcharts pour « ${esc(sd.artist.name)} ». Vérifiez que c'est bien le bon artiste.</div>`
+        + (pf==='spotify' ? h('📈 Auditeurs mensuels') + rangeChips() + lineChart(((await fetchSC(name, `/api/v2/artist/{uuid}/streaming/spotify/listening?startDate=${dAgo(RANGES[state.statsRange||'3m'])}&endDate=${dAgo(0)}&limit=100`)) || {data:{items:[]}}).data.items.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>({d:x.date.slice(0,10), v:x.value})), pcol) : '')
         + h('🌍 Par pays') + co.slice(0,15).map(c=>bar(flagOf(c.countryCode)+' '+esc(c.countryName), fmtNum(c.value)+(yt?' vues':' auditeurs'), c.value, co[0].value)).join('')
         + h('🏙️ Par ville') + cp.slice(0,15).map(c=>bar(flagOf(c.countryCode)+' '+esc(c.cityName), esc(c.countryName)+' · '+fmtNum(c.value), c.value, cp[0].value)).join('');
     }
   }
   // 2) abonnés (réseaux sociaux / Deezer / YouTube)
   if(cfg.au){
-    const au = await fetchSC(name, `/api/v2/artist/{uuid}/audience/${cfg.au}`), ai = au && (au.data.items||[]).filter(x=>x.followerCount!=null).sort((a,b)=>a.date.localeCompare(b.date));
+    const rg = state.statsRange || '3m', au = await fetchSC(name, `/api/v2/artist/{uuid}/audience/${cfg.au}?startDate=${dAgo(RANGES[rg])}&endDate=${dAgo(0)}&limit=100`), ai = au && (au.data.items||[]).filter(x=>x.followerCount!=null).sort((a,b)=>a.date.localeCompare(b.date));
     if(ai && ai.length){
       const last = ai[ai.length-1], first = ai[0];
       out += h('👥 Abonnés') + tiles([statTile(fmtNum(last.followerCount),'abonnés', last.followerCount-first.followerCount, ai.map(x=>x.followerCount)), last.viewCount!=null ? statTile(fmtNum(last.viewCount),'vues totales') : '', last.postCount!=null ? statTile(fmtNum(last.postCount),'publications') : ''])
-        + `<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:6px;">Évolution sur ${ai.length} jours · Soundcharts</div>`;
+        + h('📈 Abonnés') + rangeChips() + lineChart(ai.map(x=>({d:x.date.slice(0,10), v:x.followerCount})), pcol);
     } else if(!cfg.st && !cfg.chart && !cfg.pl) out += none(`Pas de données ${plabel} pour cet artiste.`);
   }
   // 3) classements par plateforme (pays / villes)
@@ -3475,6 +3508,8 @@ async function loadArtistStats(){
       + h('📅 Titres par année') + `<div class="hpad" style="display:flex;align-items:flex-end;gap:5px;height:110px;">${years.map(y=>`<div style="flex:1;text-align:center;font-size:9px;color:var(--text-muted);"><div style="font-size:10px;font-weight:800;color:#fff;">${yr[y]}</div><div style="background:#7c5cff;border-radius:4px 4px 0 0;height:${Math.max(4,Math.round(yr[y]/max*62))}px;"></div>${y.slice(2)}</div>`).join('')}</div>`
       + h('🆕 Dernières sorties') + latest.slice(0,5).map((x,i)=>{ const art = (x.artworkUrl100||'').replace('100x100','300x300')||null; if(x.previewUrl) itStore[itKey({title:x.trackName, artist:x.artistName})] = { p:x.previewUrl, v:x.trackViewUrl||null, a:art, t:Date.now() }; return radarCard(x.trackName, x.artistName, art, radarMatch(rows,x.trackName,x.artistName), i, esc((x.releaseDate||'').slice(0,10))); }).join('');
   }
+  const sg = await fetchSC(name, '/api/v2/artist/{uuid}/songs?limit=100');
+  if(sg && (sg.data.items||[]).length) out += h('🎼 Catalogue ('+(sg.data.page && sg.data.page.total || sg.data.items.length)+' titres)') + sg.data.items.map(x=>`<div class="alert-item"><div class="aic">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:40px;height:40px;border-radius:8px;object-fit:cover;">` : '🎵'}</div><div><div class="at">${esc(x.name)}</div><div class="ad">${esc(x.creditName||'')}</div></div></div>`).join('');
   out += h('🔗 Voir l\'artiste') + `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;">${platformLinks(name, cat && cat[0] && cat[0].artistViewUrl)}</div>`
     + '<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:14px;line-height:1.5;">Sources : classements Beatport / Apple Music via Soundcharts, catalogue public Apple Music (200 titres maximum). Écoutes et abonnés : bientôt, selon les accords de données.</div>';
   host.innerHTML = out;
@@ -4194,6 +4229,7 @@ document.addEventListener('click', async (e)=>{
   }
   else if(a==='radar-tab'){ state.radarTab = el.dataset.t; state.radarArtist = null; renderView(); }
   else if(a==='radar-back'){ state.radarArtist = null; renderView(); }
+  else if(a==='stats-range'){ state.statsRange = el.dataset.r; loadArtistStats(); }
   else if(a==='stats-platform'){ state.statsPlatform = el.dataset.p; loadArtistStats(); }
   else if(a==='artist-stats'){ openArtistStats(el.dataset.n); }
   else if(a==='open-paywall'){ openPaywall(); }
