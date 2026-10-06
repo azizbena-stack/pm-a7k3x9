@@ -2804,7 +2804,7 @@ function renderView(){
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
   else if(state.view==='playlists') c.innerHTML = renderPlaylists();
-  else if(state.view==='radar'){ c.innerHTML = renderRadar(); loadRadar(); }
+  else if(state.view==='radar'){ if(!isPro()){ c.innerHTML = `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>${tr('radar.title')}</div></div></div><div class="hpad" style="margin-top:40px;"><div class="card" style="text-align:center;"><div style="font-size:34px;">📡🔒</div><h3 style="margin:10px 0 6px;">Radar réservé aux membres Premium</h3><p style="color:var(--text-muted);font-size:12.5px;line-height:1.6;">Suivez vos favoris, cherchez n'importe quel artiste et consultez ses statistiques détaillées.</p><button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="open-paywall">🔓 Débloquer Premium</button></div></div>`; } else { c.innerHTML = renderRadar(); loadRadar(); } }
   else if(state.view==='profile') c.innerHTML = renderProfile();
   c.scrollTop = 0;
 }
@@ -3382,6 +3382,7 @@ async function fetchArtistCatalog(name){
   }catch(e){ return null; }
 }
 function openArtistStats(name){
+  if(!isPro()){ openPaywall(); return; }
   const ov = document.getElementById('searchOv'); if(ov) ov.classList.add('hidden');
   state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; state.statsTab = 'overview'; renderView();
 }
@@ -3432,6 +3433,8 @@ async function loadArtistStats(){
   [['spotify',ev2],['apple-music',ev3],['beatport',ev4],['shazam',ev5]].forEach(([pf2,e])=>(e ? e.data.items||[] : []).forEach(x=>evs.push({d:x.rankDate, i:'🏆', t:'#'+x.position+' · '+x.chart.name+(x.chart.cityName ? ' ('+x.chart.cityName+')' : x.chart.countryName ? ' ('+x.chart.countryName+')' : ''), s:pname(pf2)+' · '+x.song.name+(x.positionEvolution ? ' · '+(x.positionEvolution>0?'▲':'▼')+Math.abs(x.positionEvolution) : '')})));
   evs.sort((a,b)=>String(b.d).localeCompare(String(a.d)));
   if(evs.length) ac = h('🔔 Activités récentes') + evs.slice(0,15).map(x=>`<div class="alert-item"><div class="aic">${x.i}</div><div><div class="at">${esc(x.t)}</div><div class="ad">${esc(x.s)}</div><div class="atime">${esc(String(x.d).slice(0,10))}</div></div></div>`).join('');
+  const evt = await fetchSC(name, '/api/v2/artist/{uuid}/events?limit=10');
+  if(evt && (evt.data.items||[]).length) ac += h('🎪 Événements / festivals') + evt.data.items.slice(0,10).map(x=>`<div class="alert-item"><div class="aic">🎪</div><div><div class="at">${esc(x.name||x.eventName||'')}</div><div class="ad">${esc([x.cityName,x.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.startDate||x.date||'').slice(0,10))}</div></div></div>`).join('');
   out = head + ov + ac + out;
   const iB = out.length; // début de l'onglet Audience
   const PF = {
@@ -3491,6 +3494,8 @@ async function loadArtistStats(){
   if(cfg.pl){
     const [pe, pr] = await Promise.all([fetchSC(name, `/api/v2.20/artist/{uuid}/playlist/current/${cfg.pl}?currentOnly=1&type=editorial&limit=10&sortBy=subscriberCount&sortOrder=desc`), cfg.pl==='spotify' ? fetchSC(name, '/api/v2/artist/{uuid}/playlist/reach/spotify') : null]);
     const pi = pe ? (pe.data.items||[]) : [], reach = pr && (pr.data.items||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)), r0 = reach && reach[0], rN = reach && reach[reach.length-1];
+    const pall = cfg.pl==='spotify' ? await fetchSC(name, '/api/v2.20/artist/{uuid}/playlist/current/spotify?currentOnly=1&limit=25&sortBy=subscriberCount&sortOrder=desc') : null, pal = pall ? (pall.data.items||[]) : [];
+    if(pal.length) out += h('🎶 Playlists et compilations (toutes)') + (pall.data.page ? '<div class="hpad" style="font-size:10.5px;color:var(--text-muted);">'+fmtNum(pall.data.page.total)+' playlists au total</div>' : '') + pal.map(x=>bar(esc(x.playlist.name), esc(x.song.name)+' · '+fmtNum(x.playlist.latestSubscriberCount)+' abonnés'+(x.playlist.type ? ' · '+esc(x.playlist.type) : '')+(x.playlist.ownerName ? ' · '+esc(x.playlist.ownerName) : ''), x.playlist.latestSubscriberCount, pal[0].playlist.latestSubscriberCount)).join('');
     if(pi.length || r0){
       out += h('📻 Playlists ' + plabel) + tiles([r0 ? statTile(fmtNum(r0.playlistCount),'playlists', r0.playlistCount-rN.playlistCount, reach.map(x=>x.playlistCount).reverse()) : '', r0 ? statTile(fmtNum(r0.playlistReach),'portée (abonnés)') : '', pe && pe.data.page ? statTile(fmtNum(pe.data.page.total),'éditoriales') : ''])
         + pi.map(x=>bar(esc(x.playlist.name), esc(x.song.name)+' · '+fmtNum(x.playlist.latestSubscriberCount)+' abonnés · position '+x.position, x.playlist.latestSubscriberCount, pi[0].playlist.latestSubscriberCount)).join('');
@@ -3557,7 +3562,10 @@ async function loadRadarApple(q, rows, inId, hostId){
   // artistes trouvés (nom contenant tous les mots tapés) avec leurs liens Apple Music / Spotify / Beatport
   const qw = normText(q).split(' ').filter(Boolean), arts = new Map();
   list.forEach(x=>{ const n = x.artistName.split(/\s*(?:,|&|feat\.?)\s*/i)[0].trim(); if(n && qw.every(w=>normText(n).includes(w)) && !arts.has(n)) arts.set(n, x.artistViewUrl); });
-  const artHTML = arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,4).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques par pays et ville</span>${platformLinks(n,u)}</div></div>`).join('') : '';
+  try{ const ra = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=musicArtist&limit=10`); if(ra.ok) (await ra.json()).results.forEach(x=>{ if(x.artistName && !arts.has(x.artistName)) arts.set(x.artistName, x.artistLinkUrl); }); }catch(e){}
+  if(!document.getElementById(hostId) || inp.value.trim()!==q) return;
+  if(!arts.size && q.length>=2) arts.set(q, null);
+  const artHTML = arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,8).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques par pays et ville</span>${platformLinks(n,u)}</div></div>`).join('') : '';
   host.innerHTML = (artHTML || fallbackLinks(q)) + (list.length ? list.map((x,i)=>{
     const art = (x.artworkUrl100||'').replace('100x100','300x300') || null;
     if(x.previewUrl) itStore[itKey({title:x.trackName, artist:x.artistName})] = { p:x.previewUrl, v:x.trackViewUrl||null, a:art, t:now };
