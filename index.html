@@ -38,6 +38,7 @@
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
+input,select,textarea{font-size:16px !important;}
 body{
   margin:0;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -236,7 +237,7 @@ button{font-family:inherit;}
 .meter > div{ height:100%; background:var(--series-blue); border-radius:4px;}
 
 .radar-tabs{ display:flex; gap:5px; padding:6px 10px 4px; justify-content:center;}
-.radar-tabs .chip{ padding:7px 4px; font-size:11px; letter-spacing:0; flex:1 1 auto; min-width:0; white-space:nowrap; text-align:center;}
+.radar-tabs .chip{ padding:7px 2px; font-size:10.5px; overflow:hidden; text-overflow:ellipsis; letter-spacing:0; flex:1 1 auto; min-width:0; white-space:nowrap; text-align:center;}
 .alert-item{ display:flex; gap:11px; padding:12px 18px; align-items:flex-start;}
 .alert-item .aic{ width:36px;height:36px;border-radius:11px; background:var(--card-2); display:flex;align-items:center;justify-content:center; font-size:16px; flex:0 0 36px; border:1px solid var(--border);}
 .alert-item .at{ font-size:12.5px; font-weight:700;}
@@ -3463,6 +3464,7 @@ async function loadArtistStats(){
   out += h('🎧 Audience par plateforme') + `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;">${Object.entries(PF).map(([k,[l,c]])=>`<span class="chip ${k===pf?'active':''}" data-action="stats-platform" data-p="${k}" style="${k===pf?'background:'+c+';border-color:'+c+';color:#fff;':''}">${l}</span>`).join('')}</div>`;
   const bar = (label, sub, v, max) => `<div class="alert-item"><div style="flex:1;"><div class="at">${label}</div><div class="ad">${sub}</div><div style="height:5px;border-radius:3px;background:var(--card-2);margin-top:5px;"><div style="height:5px;border-radius:3px;background:${pcol};width:${Math.max(3,Math.round(100*v/max))}%;"></div></div></div></div>`;
   const none = t => `<div class="empty-msg">${t}</div>`;
+  const L5 = a => withLockBanner(a.map((s,i)=>i>=5&&!isPro()?`<div class="lock-row">${s}</div>`:s), 5); // Premium : floutées dès la 6e ligne
   // 1) écoutes par pays / ville (Spotify, YouTube)
   if(cfg.st){
     if(!sd) out += none(`Pas d'écoutes ${plabel} pour cet artiste chez Soundcharts (artiste trop petit ou non référencé).`);
@@ -3478,8 +3480,8 @@ async function loadArtistStats(){
       out += tiles([yt ? statTile(fmtNum(co.reduce((t,c)=>t+c.value,0)), 'vues (28 j)') : cur ? statTile(fmtNum(cur.value), 'auditeurs mensuels', wk ? cur.value-wk.value : 0, lst.slice(0,30).map(x=>x.value).reverse()) : '', statTile(co.length,'pays'), statTile(cp.length,'villes')])
         + `<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:6px;">Données Soundcharts pour « ${esc(sd.artist.name)} ». Vérifiez que c'est bien le bon artiste.</div>`
         + (pf==='spotify' ? h('📈 Auditeurs mensuels') + rangeChips() + lineChart(((await fetchSC(name, `/api/v2/artist/{uuid}/streaming/spotify/listening?startDate=${dAgo(RANGES[state.statsRange||'3m'])}&endDate=${dAgo(0)}&limit=100`)) || {data:{items:[]}}).data.items.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(x=>({d:x.date.slice(0,10), v:x.value})), pcol) : '')
-        + h('🌍 Par pays') + co.slice(0,15).map(c=>bar(flagOf(c.countryCode)+' '+esc(c.countryName), fmtNum(c.value)+(yt?' vues':' auditeurs'), c.value, co[0].value)).join('')
-        + h('🏙️ Par ville') + cp.slice(0,15).map(c=>bar(flagOf(c.countryCode)+' '+esc(c.cityName), esc(c.countryName)+' · '+fmtNum(c.value), c.value, cp[0].value)).join('');
+        + h('🌍 Par pays') + L5(co.slice(0,15).map(c=>bar(flagOf(c.countryCode)+' '+esc(c.countryName), fmtNum(c.value)+(yt?' vues':' auditeurs'), c.value, co[0].value)))
+        + h('🏙️ Par ville') + L5(cp.slice(0,15).map(c=>bar(flagOf(c.countryCode)+' '+esc(c.cityName), esc(c.countryName)+' · '+fmtNum(c.value), c.value, cp[0].value)));
     }
   }
   // 2) abonnés (réseaux sociaux / Deezer / YouTube)
@@ -3501,9 +3503,9 @@ async function loadArtistStats(){
       const cn = cc.filter(([k])=>k!=='--'), ctry = cfg.st ? '🌍 Classements par pays' : '🌍 Par pays', city = cfg.st ? '🏙️ Classements par ville' : '🏙️ Par ville';
       if(!cfg.st){ real = {}; cn.forEach(([k,o])=>{ real[k] = {n:o.pts, name:o.name, top:'', lab:o.n+' classement(s) · meilleure place #'+o.best}; }); }
       out += tiles([statTile(total,'classements actifs'), statTile(cc.filter(([k])=>k!=='--').length,'pays'), statTile('#'+Math.min(...ci.map(x=>x.position)),'meilleure place'), statTile(new Set(ci.map(x=>x.song.name)).size,'titres')])
-        + (cn.length ? h(ctry) : '') + cn.slice(0,15).map(([k,o])=>bar(flagOf(k)+' '+esc(o.name), o.n+' classement(s) · meilleure place #'+o.best, o.pts, cc[0][1].pts)).join('')
-        + (ci.some(x=>x.chart.cityName) ? h(city) + ci.filter(x=>x.chart.cityName).slice(0,12).map(x=>bar(flagOf(x.chart.countryCode||'')+' '+esc(x.chart.cityName), esc(x.song.name)+' · #'+x.position+(x.positionEvolution ? ' ('+(x.positionEvolution>0?'▲':'▼')+Math.abs(x.positionEvolution)+')' : ''), 101-x.position, 100)).join('') : '')
-        + h('🏆 Meilleurs classements') + ci.slice(0,15).map(x=>bar(esc(x.chart.name)+' '+(x.chart.countryCode ? flagOf(x.chart.countryCode) : ''), esc(x.song.name)+' · #'+x.position+(x.timeOnChart ? ' · '+x.timeOnChart+' '+esc(x.timeOnChartUnit||'') : ''), 101-x.position, 100)).join('');
+        + (cn.length ? h(ctry) : '') + L5(cn.slice(0,15).map(([k,o])=>bar(flagOf(k)+' '+esc(o.name), o.n+' classement(s) · meilleure place #'+o.best, o.pts, cc[0][1].pts)))
+        + (ci.some(x=>x.chart.cityName) ? h(city) + L5(ci.filter(x=>x.chart.cityName).slice(0,12).map(x=>bar(flagOf(x.chart.countryCode||'')+' '+esc(x.chart.cityName), esc(x.song.name)+' · #'+x.position+(x.positionEvolution ? ' ('+(x.positionEvolution>0?'▲':'▼')+Math.abs(x.positionEvolution)+')' : ''), 101-x.position, 100))) : '')
+        + h('🏆 Meilleurs classements') + L5(ci.slice(0,15).map(x=>bar(esc(x.chart.name)+' '+(x.chart.countryCode ? flagOf(x.chart.countryCode) : ''), esc(x.song.name)+' · #'+x.position+(x.timeOnChart ? ' · '+x.timeOnChart+' '+esc(x.timeOnChartUnit||'') : ''), 101-x.position, 100)));
     }
   }
   if(pf==='shazam') out += h('🔢 Nombre de Shazam') + tiles([statTile('En cours','Shazam total artiste'), statTile('En cours','Shazam par titre')]);
@@ -3512,10 +3514,10 @@ async function loadArtistStats(){
     const [pe, pr] = await Promise.all([fetchSC(name, `/api/v2.20/artist/{uuid}/playlist/current/${cfg.pl}?currentOnly=1&type=editorial&limit=10&sortBy=subscriberCount&sortOrder=desc`), cfg.pl==='spotify' ? fetchSC(name, '/api/v2/artist/{uuid}/playlist/reach/spotify') : null]);
     const pi = pe ? (pe.data.items||[]) : [], reach = pr && (pr.data.items||[]).slice().sort((a,b)=>b.date.localeCompare(a.date)), r0 = reach && reach[0], rN = reach && reach[reach.length-1];
     const pall = cfg.pl==='spotify' ? await fetchSC(name, '/api/v2.20/artist/{uuid}/playlist/current/spotify?currentOnly=1&limit=25&sortBy=subscriberCount&sortOrder=desc') : null, pal = pall ? (pall.data.items||[]) : [];
-    if(pal.length) out += h('🎶 Playlists et compilations (toutes)') + (pall.data.page ? '<div class="hpad" style="font-size:10.5px;color:var(--text-muted);">'+fmtNum(pall.data.page.total)+' playlists au total</div>' : '') + pal.map(x=>bar(esc(x.playlist.name), esc(x.song.name)+' · '+fmtNum(x.playlist.latestSubscriberCount)+' abonnés'+(x.playlist.type ? ' · '+esc(x.playlist.type) : '')+(x.playlist.ownerName ? ' · '+esc(x.playlist.ownerName) : ''), x.playlist.latestSubscriberCount, pal[0].playlist.latestSubscriberCount)).join('');
+    if(pal.length) out += h('🎶 Playlists et compilations (toutes)') + (pall.data.page ? '<div class="hpad" style="font-size:10.5px;color:var(--text-muted);">'+fmtNum(pall.data.page.total)+' playlists au total</div>' : '') + L5(pal.map(x=>bar(esc(x.playlist.name), esc(x.song.name)+' · '+fmtNum(x.playlist.latestSubscriberCount)+' abonnés'+(x.playlist.type ? ' · '+esc(x.playlist.type) : '')+(x.playlist.ownerName ? ' · '+esc(x.playlist.ownerName) : ''), x.playlist.latestSubscriberCount, pal[0].playlist.latestSubscriberCount)));
     if(pi.length || r0){
       out += h('📻 Playlists ' + plabel) + tiles([r0 ? statTile(fmtNum(r0.playlistCount),'playlists', r0.playlistCount-rN.playlistCount, reach.map(x=>x.playlistCount).reverse()) : '', r0 ? statTile(fmtNum(r0.playlistReach),'portée (abonnés)') : '', pe && pe.data.page ? statTile(fmtNum(pe.data.page.total),'éditoriales') : ''])
-        + pi.map(x=>bar(esc(x.playlist.name), esc(x.song.name)+' · '+fmtNum(x.playlist.latestSubscriberCount)+' abonnés · position '+x.position, x.playlist.latestSubscriberCount, pi[0].playlist.latestSubscriberCount)).join('');
+        + L5(pi.map(x=>bar(esc(x.playlist.name), esc(x.song.name)+' · '+fmtNum(x.playlist.latestSubscriberCount)+' abonnés · position '+x.position, x.playlist.latestSubscriberCount, pi[0].playlist.latestSubscriberCount)));
     } else if(!cfg.st && !cfg.chart && !cfg.au) out += none(`Pas de playlists ${plabel} pour cet artiste.`);
   }
   if(real && Object.keys(real).length) out += h('🗺️ Carte du monde · '+plabel) + worldMapHTML(world, mine, real, pcol);
