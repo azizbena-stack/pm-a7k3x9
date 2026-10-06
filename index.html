@@ -3473,7 +3473,7 @@ async function loadArtistStats(){
       const last = ai[ai.length-1], first = ai[0];
       out += h('👥 Abonnés') + tiles([statTile(fmtNum(last.followerCount),'abonnés', last.followerCount-first.followerCount, ai.map(x=>x.followerCount)), last.viewCount!=null ? statTile(fmtNum(last.viewCount),'vues totales') : '', last.postCount!=null ? statTile(fmtNum(last.postCount),'publications') : ''])
         + h('📈 Abonnés') + rangeChips() + lineChart(ai.map(x=>({d:x.date.slice(0,10), v:x.followerCount})), pcol);
-    } else if(!cfg.st && !cfg.chart && !cfg.pl) out += none(`Pas de données ${plabel} pour cet artiste.`);
+    } else if(!cfg.st && !cfg.chart && !cfg.pl) out += none(`Pas de données ${plabel} : artiste pas assez connu.`);
   }
   // 3) classements par plateforme (pays / villes)
   if(cfg.chart){
@@ -3490,6 +3490,7 @@ async function loadArtistStats(){
         + h('🏆 Meilleurs classements') + ci.slice(0,15).map(x=>bar(esc(x.chart.name)+' '+(x.chart.countryCode ? flagOf(x.chart.countryCode) : ''), esc(x.song.name)+' · #'+x.position+(x.timeOnChart ? ' · '+x.timeOnChart+' '+esc(x.timeOnChartUnit||'') : ''), 101-x.position, 100)).join('');
     }
   }
+  if(pf==='shazam') out += h('🔢 Nombre de Shazam') + tiles([statTile('En cours','Shazam total artiste'), statTile('En cours','Shazam par titre')]);
   // 4) playlists (éditoriales d'abord, par nombre d'abonnés) + portée
   if(cfg.pl){
     const [pe, pr] = await Promise.all([fetchSC(name, `/api/v2.20/artist/{uuid}/playlist/current/${cfg.pl}?currentOnly=1&type=editorial&limit=10&sortBy=subscriberCount&sortOrder=desc`), cfg.pl==='spotify' ? fetchSC(name, '/api/v2/artist/{uuid}/playlist/reach/spotify') : null]);
