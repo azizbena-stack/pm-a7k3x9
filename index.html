@@ -3383,7 +3383,7 @@ async function fetchArtistCatalog(name){
 }
 function openArtistStats(name){
   const ov = document.getElementById('searchOv'); if(ov) ov.classList.add('hidden');
-  state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; renderView();
+  state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; state.statsTab = 'overview'; renderView();
 }
 async function loadArtistStats(){
   const name = state.radarArtist;
@@ -3433,6 +3433,7 @@ async function loadArtistStats(){
   evs.sort((a,b)=>String(b.d).localeCompare(String(a.d)));
   if(evs.length) ac = h('🔔 Activités récentes') + evs.slice(0,15).map(x=>`<div class="alert-item"><div class="aic">${x.i}</div><div><div class="at">${esc(x.t)}</div><div class="ad">${esc(x.s)}</div><div class="atime">${esc(String(x.d).slice(0,10))}</div></div></div>`).join('');
   out = head + ov + ac + out;
+  const iB = out.length; // début de l'onglet Audience
   const PF = {
     spotify:['🟢 Spotify','#1db954',{chart:'spotify',pl:'spotify',st:'spotify',au:'spotify'}], youtube:['🔴 YouTube','#ff3b3b',{pl:'youtube',st:'youtube',au:'youtube'}],
     apple:['🍎 Apple Music','#fa2d48',{chart:'apple-music',pl:'apple-music'}], beatport:['🟠 Beatport','#ff7a00',{chart:'beatport'}],
@@ -3496,6 +3497,7 @@ async function loadArtistStats(){
     } else if(!cfg.st && !cfg.chart && !cfg.au) out += none(`Pas de playlists ${plabel} pour cet artiste.`);
   }
   if(real && Object.keys(real).length) out += h('🗺️ Carte du monde · '+plabel) + worldMapHTML(world, mine, real, pcol);
+  const iC = out.length; // début de l'onglet Catalogue
   out += h('🍎 Catalogue Apple Music');
   if(cat===null) out += '<div class="empty-msg">Catalogue Apple indisponible pour le moment, réessayez dans une minute.</div>';
   else if(!cat.length) out += '<div class="empty-msg">Aucun titre trouvé sur Apple Music.</div>';
@@ -3512,7 +3514,8 @@ async function loadArtistStats(){
   if(sg && (sg.data.items||[]).length) out += h('🎼 Catalogue ('+(sg.data.page && sg.data.page.total || sg.data.items.length)+' titres)') + sg.data.items.map(x=>`<div class="alert-item"><div class="aic">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:40px;height:40px;border-radius:8px;object-fit:cover;">` : '🎵'}</div><div><div class="at">${esc(x.name)}</div><div class="ad">${esc(x.creditName||'')}</div></div></div>`).join('');
   out += h('🔗 Voir l\'artiste') + `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;">${platformLinks(name, cat && cat[0] && cat[0].artistViewUrl)}</div>`
     + '<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:14px;line-height:1.5;">Sources : classements Beatport / Apple Music via Soundcharts, catalogue public Apple Music (200 titres maximum). Écoutes et abonnés : bientôt, selon les accords de données.</div>';
-  host.innerHTML = out;
+  const tb = state.statsTab || 'overview', tab = (k,l)=>`<span class="chip ${k===tb?'active':''}" data-action="stats-tab" data-t="${k}">${l}</span>`;
+  host.innerHTML = `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;margin-top:8px;">${tab('overview','📊 Vue d\'ensemble')}${tab('audience','🎧 Audience')}${tab('catalog','🎼 Catalogue')}</div>` + (tb==='audience' ? out.slice(iB, iC) : tb==='catalog' ? out.slice(iC) : out.slice(0, iB));
 }
 
 function radarSavedHTML(rows){
@@ -4229,6 +4232,7 @@ document.addEventListener('click', async (e)=>{
   }
   else if(a==='radar-tab'){ state.radarTab = el.dataset.t; state.radarArtist = null; renderView(); }
   else if(a==='radar-back'){ state.radarArtist = null; renderView(); }
+  else if(a==='stats-tab'){ state.statsTab = el.dataset.t; loadArtistStats(); }
   else if(a==='stats-range'){ state.statsRange = el.dataset.r; loadArtistStats(); }
   else if(a==='stats-platform'){ state.statsPlatform = el.dataset.p; loadArtistStats(); }
   else if(a==='artist-stats'){ openArtistStats(el.dataset.n); }
