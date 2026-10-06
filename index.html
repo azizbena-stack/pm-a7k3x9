@@ -1033,7 +1033,7 @@ const state = {
   exploreCityPlatform: 'spotify', // apple_music | spotify | shazam — live city charts
   homeCityPlatform: 'spotify',
   countryCity: '',
-  radarTab: 'saved',
+  radarTab: 'mine',
   favTracks: new Set(),
   favArtists: new Set(),
   favCities: new Set(),
@@ -3292,7 +3292,7 @@ function renderRadar(){
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('radar.title')}</div></div>
-    <div class="radar-tabs">${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}</div>
+    <div class="radar-tabs">${tab('mine','🎤 Mes artistes')}${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}</div>
   </div>
   ${t==='search' ? `<div class="hpad" style="margin:8px 0;"><input id="radarInp" type="search" placeholder="Artiste ou morceau : où est-il classé ?" oninput="renderRadarSearch()" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"></div>` : ''}
   <div id="radarBody"><div class="empty-msg">Chargement…</div></div>
@@ -3302,6 +3302,7 @@ async function loadRadar(){
   if(state.radarArtist){ loadArtistStats(); return; }
   const t = state.radarTab;
   if(t==='search'){ renderRadarSearch(); return; }
+  if(t==='mine'){ const m = myArtists(), host = document.getElementById('radarBody'); if(host) host.innerHTML = m.length ? m.map(n=>`<div style="padding:10px 18px;"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">${esc(n)}${state.user && normText(n)===normText(state.user.artistName) ? ' <span style="font-size:10px;color:var(--text-muted);">(mon artiste)</span>' : ''}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span></div></div>`).join('') + '<div class="empty-msg">Pour ajouter un autre artiste : 🔍 Rechercher (payant, '+EXTRA_ARTIST_PRICE+' / mois par artiste).</div>' : '<div class="empty-msg">Aucun artiste suivi.<br>Allez dans 🔍 Rechercher, trouvez votre artiste et choisissez-le : il est inclus dans Premium. 📡</div>'; return; }
   const rows = await loadRadarRows();
   const html = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
   const host = document.getElementById('radarBody');
@@ -3380,8 +3381,23 @@ async function fetchArtistCatalog(name){
     artistCatCache.set(name, list); return list;
   }catch(e){ return null; }
 }
+/* Radar façon Songstats : l'artiste du profil (artistName) est inclus dans Premium ; chaque artiste supplémentaire est payant (achat = démo, gardé sur l'appareil). */
+const EXTRA_ARTIST_PRICE = '2,99 €'; // ponytail: prix provisoire, à fixer avant la publication
+const extraArtists = () => { try{ return JSON.parse(localStorage.getItem('pm_extra_artists')||'[]'); }catch(e){ return []; } };
+const myArtists = () => (state.user && state.user.artistName ? [state.user.artistName] : []).concat(extraArtists());
+const ownsArtist = n => myArtists().some(x=>normText(x)===normText(n));
+function openArtistBuy(name){
+  const free = state.user && !state.user.artistName, ov = document.getElementById('paywallOverlay'), n = esc(name);
+  ov.classList.remove('hidden');
+  ov.innerHTML = `<div class="sheet-inner"><div style="text-align:center;"><div style="font-size:30px;">📡</div><h3 style="margin:8px 0 4px;">${n}</h3>
+    <p style="font-size:12.5px;color:var(--text-muted);line-height:1.6;">${free ? 'Choisir cet artiste comme <b>mon artiste</b> : inclus dans Premium. Les statistiques détaillées sont réservées à votre artiste.' : 'Votre Radar suit déjà votre artiste. Pour voir les statistiques de « '+n+' », ajoutez-le comme artiste supplémentaire : <b>'+EXTRA_ARTIST_PRICE+' / mois</b>.'}</p></div>
+    <button class="btn btn-primary btn-block" data-action="${free ? 'claim-artist' : 'buy-artist'}" data-n="${n}">${free ? '✓ Choisir comme mon artiste' : '➕ Ajouter cet artiste ('+EXTRA_ARTIST_PRICE+' / mois)'}</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:9px;" data-action="close-paywall">${tr('paywall.later')}</button>
+    <p style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:12px;">${tr('paywall.labelOffer')}</p></div>`;
+}
 function openArtistStats(name){
   if(!isPro()){ openPaywall(); return; }
+  if(!ownsArtist(name)){ openArtistBuy(name); return; }
   const ov = document.getElementById('searchOv'); if(ov) ov.classList.add('hidden');
   state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; state.statsTab = 'overview'; renderView();
 }
@@ -3565,7 +3581,7 @@ async function loadRadarApple(q, rows, inId, hostId){
   try{ const ra = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=musicArtist&limit=10`); if(ra.ok) (await ra.json()).results.forEach(x=>{ if(x.artistName && !arts.has(x.artistName)) arts.set(x.artistName, x.artistLinkUrl); }); }catch(e){}
   if(!document.getElementById(hostId) || inp.value.trim()!==q) return;
   if(!arts.size && q.length>=2) arts.set(q, null);
-  const artHTML = arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,8).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques par pays et ville</span>${platformLinks(n,u)}</div></div>`).join('') : '';
+  const artHTML = arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,8).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">${ownsArtist(n) ? '📊 Statistiques par pays et ville' : '🔒 Statistiques (artiste à ajouter)'}</span>${platformLinks(n,u)}</div></div>`).join('') : '';
   host.innerHTML = (artHTML || fallbackLinks(q)) + (list.length ? list.map((x,i)=>{
     const art = (x.artworkUrl100||'').replace('100x100','300x300') || null;
     if(x.previewUrl) itStore[itKey({title:x.trackName, artist:x.artistName})] = { p:x.previewUrl, v:x.trackViewUrl||null, a:art, t:now };
@@ -4245,6 +4261,8 @@ document.addEventListener('click', async (e)=>{
   else if(a==='stats-platform'){ state.statsPlatform = el.dataset.p; loadArtistStats(); }
   else if(a==='artist-stats'){ openArtistStats(el.dataset.n); }
   else if(a==='open-paywall'){ openPaywall(); }
+  else if(a==='claim-artist'){ state.user.artistName = el.dataset.n; persistState(); closePaywall(); openArtistStats(el.dataset.n); }
+  else if(a==='buy-artist'){ try{ localStorage.setItem('pm_extra_artists', JSON.stringify(extraArtists().concat(el.dataset.n))); }catch(e){} closePaywall(); openArtistStats(el.dataset.n); }
   else if(a==='close-paywall'){ closePaywall(); }
   else if(a==='activate-pro'){
     if(state.user){ state.user.isPro = true; }
