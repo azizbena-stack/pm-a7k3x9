@@ -3566,6 +3566,7 @@ async function renderRadarSearch(){
 const linkChip = (l,u)=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener" style="text-decoration:none;">${l}</a>`;
 const platformLinks = (q, appleUrl)=>{ q = encodeURIComponent(q); return linkChip('🍎 Apple Music', appleUrl || 'https://music.apple.com/search?term='+q) + linkChip('🟢 Spotify','https://open.spotify.com/search/'+q) + linkChip('🟠 Beatport','https://www.beatport.com/search?q='+q); };
 const fallbackLinks = q => `<div style="padding:8px 18px;"><div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">CHERCHER « ${esc(q)} » SUR</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;">${platformLinks(q)}</div></div>`;
+const radarArtistsHTML = arts => arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,8).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">${ownsArtist(n) ? '📊 Statistiques par pays et ville' : '🔒 Statistiques (artiste à ajouter)'}</span>${platformLinks(n,u)}</div></div>`).join('') : '';
 const radarAppleCache = new Map(); let radarAppleTimer = null;
 async function loadRadarApple(q, rows, inId, hostId){
   inId = inId || 'radarInp'; hostId = hostId || 'radarApple';
@@ -3573,7 +3574,7 @@ async function loadRadarApple(q, rows, inId, hostId){
   if(!r){ r = await itunesSearchOnce(q, 25); if(r.ok) radarAppleCache.set(q, r); }
   const inp = document.getElementById(inId), host = document.getElementById(hostId);
   if(!host || !inp || inp.value.trim()!==q) return; // l'utilisateur a changé de recherche
-  if(!r.ok){ host.innerHTML = fallbackLinks(q) + '<div class="empty-msg">Recherche Apple indisponible pour le moment, réessayez dans une minute.</div>'; return; }
+  if(!r.ok){ host.innerHTML = (q.length>=2 ? radarArtistsHTML(new Map([[q,null]])) : fallbackLinks(q)) + '<div class="empty-msg">Recherche Apple indisponible pour le moment, réessayez dans une minute.</div>'; return; }
   const seen = new Set(), now = Date.now();
   const list = r.results.filter(x=>x.trackName && x.artistName && !seen.has(coreTitle(x.trackName)+'|'+normText(x.artistName)) && seen.add(coreTitle(x.trackName)+'|'+normText(x.artistName)));
   // artistes trouvés (nom contenant tous les mots tapés) avec leurs liens Apple Music / Spotify / Beatport
@@ -3582,7 +3583,7 @@ async function loadRadarApple(q, rows, inId, hostId){
   try{ const ra = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=musicArtist&limit=10`); if(ra.ok) (await ra.json()).results.forEach(x=>{ if(x.artistName && !arts.has(x.artistName)) arts.set(x.artistName, x.artistLinkUrl); }); }catch(e){}
   if(!document.getElementById(hostId) || inp.value.trim()!==q) return;
   if(!arts.size && q.length>=2) arts.set(q, null);
-  const artHTML = arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,8).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">${ownsArtist(n) ? '📊 Statistiques par pays et ville' : '🔒 Statistiques (artiste à ajouter)'}</span>${platformLinks(n,u)}</div></div>`).join('') : '';
+  const artHTML = radarArtistsHTML(arts);
   host.innerHTML = (artHTML || fallbackLinks(q)) + (list.length ? list.map((x,i)=>{
     const art = (x.artworkUrl100||'').replace('100x100','300x300') || null;
     if(x.previewUrl) itStore[itKey({title:x.trackName, artist:x.artistName})] = { p:x.previewUrl, v:x.trackViewUrl||null, a:art, t:now };
