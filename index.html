@@ -238,8 +238,8 @@ html,body{overflow-x:hidden; max-width:100vw;}
 .meter{ height:5px; border-radius:4px; background:rgba(57,135,229,.16); margin-top:8px; overflow:hidden;}
 .meter > div{ height:100%; background:var(--series-blue); border-radius:4px;}
 
-.radar-tabs{ display:flex; gap:5px; padding:6px 10px 4px; justify-content:center;}
-.radar-tabs .chip{ padding:7px 2px; font-size:10.5px; overflow:hidden; text-overflow:ellipsis; letter-spacing:0; flex:1 1 auto; min-width:0; white-space:nowrap; text-align:center;}
+.radar-tabs{ display:flex; flex-wrap:wrap; gap:6px; padding:6px 10px 4px; justify-content:center;}
+.radar-tabs .chip{ padding:7px 12px; font-size:12px; letter-spacing:0; flex:0 0 auto; white-space:nowrap; text-align:center;}
 .alert-item{ display:flex; gap:11px; padding:12px 18px; align-items:flex-start;}
 .alert-item .aic{ width:36px;height:36px;border-radius:11px; background:var(--card-2); display:flex;align-items:center;justify-content:center; font-size:16px; flex:0 0 36px; border:1px solid var(--border);}
 .alert-item .at{ font-size:12.5px; font-weight:700;}
@@ -1295,7 +1295,7 @@ const I18N = {
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Genres`,
     'home.trendingNow': `🔥 Trending Now`,
-    'home.topGlobal': `GLOBAL TOP 100`,
+    'home.topGlobal': `GLOBAL TOP 100/500`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Débloquer le Top 100 complet — Premium`,
@@ -1449,7 +1449,7 @@ const I18N = {
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Genres`,
     'home.trendingNow': `🔥 Trending Now`,
-    'home.topGlobal': `GLOBAL TOP 100`,
+    'home.topGlobal': `GLOBAL TOP 100/500`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Unlock the full Top 100 — Premium`,
@@ -1603,7 +1603,7 @@ const I18N = {
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Géneros`,
     'home.trendingNow': `🔥 Tendencias`,
-    'home.topGlobal': `TOP 100 GLOBAL`,
+    'home.topGlobal': `TOP 100/500 GLOBAL`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Desbloquear el Top 100 completo — Premium`,
@@ -1757,7 +1757,7 @@ const I18N = {
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Genres`,
     'home.trendingNow': `🔥 Im Trend`,
-    'home.topGlobal': `GLOBALE TOP 100`,
+    'home.topGlobal': `GLOBALE TOP 100/500`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Komplette Top 100 freischalten — Premium`,
@@ -2907,7 +2907,7 @@ function renderHome(){
       </div>`).join('')}
   </div>
 
-  <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' '+(state.countryCity?cityById(state.countryCity).name:cname(state.selectedCountry)).toUpperCase():''}</h2>
+  <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' 100/500 '+(state.countryCity?cityById(state.countryCity).name:cname(state.selectedCountry)).toUpperCase():''}</h2>
     ${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}
   </div>
   ${cityViewId() ? `
