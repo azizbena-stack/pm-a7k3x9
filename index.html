@@ -3092,14 +3092,12 @@ function renderNextBig(){
       </div>
     </div>`;
   }
-  const list = TRACKS.filter(t=>t.isNextBig && trackMatchesGenreFilter(t)).sort((a,b)=>b.growth14d-a.growth14d);
+  const list = TRACKS.filter(t=>t.isNextBig).sort((a,b)=>b.growth14d-a.growth14d);
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('nextbig.title')}<small>${tr('nextbig.subtitle')}</small></div></div>
     <div class="chiprow">
-      <div class="chip ${quickGenreActive('all')?'active':''}" data-action="quickgenre" data-g="all">${tr('home.chipAll')}</div>
-      <div class="chip ${quickGenreActive('afro-house')?'active':''}" data-action="quickgenre" data-g="afro-house">${tr('home.chipAfroHouse')}</div>
-      <div class="chip ${quickGenreActive('melodic')?'active':''}" data-action="quickgenre" data-g="melodic">${tr('home.chipMelodic')}</div>
+      <div class="chip active">${tr('home.chipAll')}</div>
     </div>
   </div>
   <div class="hpad" style="display:flex;flex-direction:column;gap:12px;margin-top:8px;">
@@ -3307,7 +3305,7 @@ async function loadRadar(){
   if(state.radarArtist){ loadArtistStats(); return; }
   const t = state.radarTab;
   if(t==='search'){ renderRadarSearch(); return; }
-  if(t==='events'){ const m = myArtists(), host = document.getElementById('radarBody'); if(!m.length){ if(host) host.innerHTML = '<div class="empty-msg">Choisissez votre artiste dans 🔍 Rechercher pour voir ses événements et festivals.</div>'; return; } const parts = await Promise.all(m.map(n=>artistEventsHTML(n))); if(host && state.view==='radar' && state.radarTab===t && !state.radarArtist) host.innerHTML = m.map((n,k)=>`<div style="padding:10px 18px 0;font-weight:800;">📊 ${esc(n)}</div>`+(parts[k]||'<div class="empty-msg">Aucun événement trouvé.</div>')).join(''); return; }
+  if(t==='events'){ renderEvents(); return; }
   if(t==='mine'){ const m = myArtists(), host = document.getElementById('radarBody'); if(host) host.innerHTML = m.length ? m.map(n=>`<div style="padding:10px 18px;"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">${esc(n)}${state.user && normText(n)===normText(state.user.artistName) ? ' <span style="font-size:10px;color:var(--text-muted);">(mon artiste)</span>' : ''}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span><span class="chip" data-action="del-artist" data-n="${esc(n)}">✕ Retirer</span></div></div>`).join('') + '<div class="empty-msg">Pour ajouter un autre artiste : 🔍 Rechercher (payant, '+EXTRA_ARTIST_PRICE+' / mois par artiste).</div>' : '<div class="empty-msg">Aucun artiste suivi.<br>Allez dans 🔍 Rechercher, trouvez votre artiste et choisissez-le : il est inclus dans Premium. 📡</div>'; return; }
   const rows = await loadRadarRows();
   const html = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
@@ -3405,11 +3403,24 @@ function openArtistStats(name){
   const ov = document.getElementById('searchOv'); if(ov) ov.classList.add('hidden');
   state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; state.statsTab = 'overview'; renderView();
 }
+async function renderEvents(){
+  const host = document.getElementById('radarBody'); if(!host) return;
+  host.innerHTML = '<div class="hpad" style="margin:8px 0;"><input id="evInp" type="search" placeholder="Nom d\'un artiste (même hors classement)" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:16px;"></div><div id="evOut"></div>';
+  const inp = document.getElementById('evInp'), out = document.getElementById('evOut');
+  const show = async names => {
+    out.innerHTML = '<div class="empty-msg">Chargement…</div>';
+    const parts = await Promise.all(names.map(n=>artistEventsHTML(n)));
+    if(!document.getElementById('evOut')) return;
+    out.innerHTML = names.map((n,k)=>`<div style="padding:10px 18px 0;font-weight:800;">🎤 ${esc(n)}</div>`+(parts[k]||'<div class="empty-msg">Aucun événement à venir trouvé.</div>')).join('') || '<div class="empty-msg">Tapez un artiste et validez : ses prochains événements et festivals s\'affichent.</div>';
+  };
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter' && inp.value.trim().length>=2) show([inp.value.trim()]); });
+  const m = myArtists(); if(m.length) show(m); else out.innerHTML = '<div class="empty-msg">Tapez un artiste et validez : ses prochains événements et festivals s\'affichent.</div>';
+}
 async function artistEventsHTML(name){
   const h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
   let ac = '';
-  const evt = await fetchSC(name, '/api/v2/artist/{uuid}/events?limit=10');
-  if(evt && (evt.data.items||[]).length) ac += h('🎪 Événements / festivals') + evt.data.items.slice(0,10).map(x=>`<div class="alert-item"><div class="aic">🎪</div><div><div class="at">${esc(x.name||x.eventName||'')}</div><div class="ad">${esc([x.cityName,x.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.startDate||x.date||'').slice(0,10))}</div></div></div>`).join('');
+  const evt = await fetchSC(name, '/api/v2/artist/{uuid}/events?limit=100');
+  if(evt && (evt.data.items||[]).length) ac += h('🎪 Événements / festivals') + evt.data.items.filter(x=>String(x.startDate||x.date||'').slice(0,10)>=new Date().toISOString().slice(0,10)).sort((a,b)=>String(a.startDate||a.date).localeCompare(String(b.startDate||b.date))).slice(0,30).map(x=>`<div class="alert-item"><div class="aic">🎪</div><div><div class="at">${esc(x.name||x.eventName||'')}</div><div class="ad">${esc([x.cityName,x.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.startDate||x.date||'').slice(0,10))}</div></div></div>`).join('');
   return ac;
 }
 /* ---------------------------- IDENTIFIER (style Shazam) ----------------------------
