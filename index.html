@@ -2849,7 +2849,7 @@ function renderHome(){
   <div class="topbar">
     <div class="brand-row">
       <div class="brand"><span class="dot"></span>Pulse Music<small>${tr('home.brandSmall')}</small></div>
-      <button class="icon-btn" data-action="open-search">🔍</button>
+      <span style="display:flex;gap:8px;"><button class="icon-btn" data-action="open-shazam">🎵</button><button class="icon-btn" data-action="open-search">🔍</button></span>
     </div>
     <div class="segmented">
       <button class="${state.scope==='world'?'active':''}" data-action="scope" data-scope="world">${tr('home.scopeWorld')}</button>
@@ -3296,7 +3296,7 @@ function renderRadar(){
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('radar.title')}</div></div>
-    <div class="radar-tabs">${tab('mine','🎤 Mes artistes')}${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}${tab('activity','📰 Activité')}${tab('shazam','🎵 Shazam')}</div>
+    <div class="radar-tabs">${tab('mine','🎤 Mes artistes')}${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}${tab('activity','📰 Activité')}</div>
   </div>
   ${t==='search' ? `<div class="hpad" style="margin:8px 0;"><input id="radarInp" type="search" placeholder="Artiste ou morceau : où est-il classé ?" oninput="renderRadarSearch()" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"></div>` : ''}
   <div id="radarBody"><div class="empty-msg">Chargement…</div></div>
@@ -3308,7 +3308,7 @@ async function loadRadar(){
   if(t==='search'){ renderRadarSearch(); return; }
   if(t==='shazam'){ renderShazam(); return; }
   if(t==='activity'){ const m = myArtists(), host = document.getElementById('radarBody'); if(!m.length){ if(host) host.innerHTML = '<div class="empty-msg">Choisissez votre artiste dans 🔍 Rechercher pour voir son activité récente et ses événements.</div>'; return; } const parts = await Promise.all(m.map(n=>artistActivityHTML(n))); if(host && state.view==='radar' && state.radarTab===t && !state.radarArtist) host.innerHTML = m.map((n,k)=>`<div style="padding:10px 18px 0;font-weight:800;">📊 ${esc(n)}</div>`+(parts[k]||'<div class="empty-msg">Aucune activité récente.</div>')).join(''); return; }
-  if(t==='mine'){ const m = myArtists(), host = document.getElementById('radarBody'); if(host) host.innerHTML = m.length ? m.map(n=>`<div style="padding:10px 18px;"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">${esc(n)}${state.user && normText(n)===normText(state.user.artistName) ? ' <span style="font-size:10px;color:var(--text-muted);">(mon artiste)</span>' : ''}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span></div></div>`).join('') + '<div class="empty-msg">Pour ajouter un autre artiste : 🔍 Rechercher (payant, '+EXTRA_ARTIST_PRICE+' / mois par artiste).</div>' : '<div class="empty-msg">Aucun artiste suivi.<br>Allez dans 🔍 Rechercher, trouvez votre artiste et choisissez-le : il est inclus dans Premium. 📡</div>'; return; }
+  if(t==='mine'){ const m = myArtists(), host = document.getElementById('radarBody'); if(host) host.innerHTML = m.length ? m.map(n=>`<div style="padding:10px 18px;"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">${esc(n)}${state.user && normText(n)===normText(state.user.artistName) ? ' <span style="font-size:10px;color:var(--text-muted);">(mon artiste)</span>' : ''}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span><span class="chip" data-action="del-artist" data-n="${esc(n)}">✕ Retirer</span></div></div>`).join('') + '<div class="empty-msg">Pour ajouter un autre artiste : 🔍 Rechercher (payant, '+EXTRA_ARTIST_PRICE+' / mois par artiste).</div>' : '<div class="empty-msg">Aucun artiste suivi.<br>Allez dans 🔍 Rechercher, trouvez votre artiste et choisissez-le : il est inclus dans Premium. 📡</div>'; return; }
   const rows = await loadRadarRows();
   const html = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
   const host = document.getElementById('radarBody');
@@ -4297,6 +4297,8 @@ document.addEventListener('click', async (e)=>{
     if(state.exploreOpenCityId) loadExploreCityList(state.exploreOpenCityId);
   }
   else if(a==='radar-tab'){ state.radarTab = el.dataset.t; state.radarArtist = null; renderView(); }
+  else if(a==='open-shazam'){ state.view = 'radar'; state.radarTab = 'shazam'; state.radarArtist = null; renderView(); }
+  else if(a==='del-artist'){ const n = el.dataset.n; if(state.user && normText(state.user.artistName)===normText(n)){ state.user.artistName = ''; persistState(); } try{ localStorage.setItem('pm_extra_artists', JSON.stringify(extraArtists().filter(x=>normText(x)!==normText(n)))); }catch(e){} renderView(); }
   else if(a==='shazam-listen'){ shazamListen(); }
   else if(a==='found-del'){ const L = foundList(); L.splice(+el.dataset.i,1); try{ localStorage.setItem('pm_found', JSON.stringify(L)); }catch(e){} const f = document.getElementById('shzFound'); if(f) f.innerHTML = foundHTML(); }
   else if(a==='radar-back'){ state.radarArtist = null; renderView(); }
