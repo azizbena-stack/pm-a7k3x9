@@ -3437,48 +3437,51 @@ async function toWav(blob){
   const wavBlob = new Blob([v],{type:'audio/wav'}); wavBlob.rms = Math.sqrt(e/n); return wavBlob;
 }
 let shzErr = '', shzVotes = {};
-let shzAuto = false, shzRun = false, shzRec = null, shzCancel = false, shzLast = 0, shzDeadline = 0;
+let shzAuto = false, shzRun = false, shzRec = null, shzLast = 0, shzDeadline = 0, shzHit = false;
 const shzSay = t => { const m = document.getElementById('shzMsg'); if(m) m.textContent = t; };
 const shzAutoTxt = () => { const a = document.getElementById('shzAuto'); if(a) a.textContent = shzAuto ? '🔁 Mode automatique — touchez le logo pour arrêter' : 'Double-touchez le logo pour le mode automatique'; };
-function shazamStop(){ shzRun = false; shzAuto = false; shzCancel = true; if(shzRec && shzRec.state!=='inactive') shzRec.stop(); shzAutoTxt(); }
-// Un appui lance une session (jusqu'à 45 s sans résultat) ; un nouvel appui l'arrête ; double appui = mode automatique (continue après chaque morceau trouvé).
+const shzAnim = on => { const b = document.getElementById('shzBtn'); if(b){ b.classList.toggle('shz-on', on); b.parentNode.classList.toggle('shz-on', on); } };
+function shazamStop(){ shzRun = false; shzAuto = false; if(shzRec && shzRec.state!=='inactive') shzRec.stop(); shzAutoTxt(); }
+// Écoute en continu : fenêtres de 7 s enregistrées à la suite (le micro reste ouvert), chacune envoyée à AudD pendant qu'on enregistre la suivante.
+// Un titre est gardé quand il est reconnu 2 fois (même titre + artiste) ; session limitée à 45 s sans résultat.
+// Un appui lance, un appui pendant l'écoute arrête, un double appui = mode automatique (continue après chaque titre).
 async function shazamListen(){
   if(Date.now()-shzLast<500) return; shzLast = Date.now();
   if(shzRun){ shazamStop(); shzSay('Arrêté'); return; }
-  shzRun = true; shzCancel = false; shzVotes = {}; shzDeadline = Date.now()+45000;
+  shzRun = true; shzHit = false; shzVotes = {}; shzErr = ''; shzDeadline = Date.now()+45000;
+  let st; try{ st = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}}); }
+  catch(e){ shzRun = false; shzSay(e && e.name==='NotAllowedError' ? 'Autorisation du micro refusée : autorisez-le dans le navigateur.' : 'Micro indisponible : '+(e && e.message || e)); return; }
+  shzAnim(true); shzSay('Écoute en cours…');
+  const pend = [];
   try{
     while(shzRun){
-      const ok = await shazamOnce(); if(!shzRun) break;
-      if(ok){ shzDeadline = Date.now()+45000; if(!shzAuto) break; await new Promise(r=>setTimeout(r,2500)); }
-      else if(Date.now()>=shzDeadline){ shzSay('Aucun titre trouvé' + (shzErr ? ' ('+shzErr.slice(0,90)+')' : '')); break; }
+      if(shzHit){ shzHit = false; if(!shzAuto) break; shzVotes = {}; shzDeadline = Date.now()+45000; await new Promise(r=>setTimeout(r,2000)); continue; }
+      if(Date.now()>=shzDeadline) break;
+      const blob = await new Promise(res=>{ const rec = shzRec = new MediaRecorder(st), ch = []; rec.ondataavailable = e=>ch.push(e.data); rec.onstop = ()=>res(new Blob(ch,{type:rec.mimeType})); rec.start(); setTimeout(()=>rec.state!=='inactive' && rec.stop(), 7000); });
+      if(!shzRun) break;
+      pend.push(shazamIdentify(blob));
     }
-  }finally{ shzRun = false; shzAuto = false; shzAutoTxt(); }
+    await Promise.all(pend);
+    if(shzRun && shzHit) { /* dernier titre trouvé pendant la clôture */ }
+    else if(shzRun && !shzHit) shzSay('Aucun titre trouvé' + (shzErr ? ' ('+shzErr.slice(0,90)+')' : ''));
+  } finally{ st.getTracks().forEach(t=>t.stop()); shzAnim(false); shzRun = false; shzAuto = false; shzAutoTxt(); }
 }
 document.addEventListener('dblclick', e=>{ if(!e.target.closest || !e.target.closest('#shzBtn')) return; shzAuto = shzRun; shzAutoTxt(); });
-async function shazamOnce(){
-  const btn = document.getElementById('shzBtn'); if(!btn) return false;
-  const say = shzSay;
+async function shazamIdentify(blob){
   try{
-    const st = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}}), rec = shzRec = new MediaRecorder(st), ch = [];
-    rec.ondataavailable = e=>ch.push(e.data); btn.parentNode.classList.add('shz-on'); btn.classList.add('shz-on'); say('Écoute en cours…');
-    const done = new Promise(r=>rec.onstop=r); rec.start(); setTimeout(()=>rec.state!=='inactive' && rec.stop(), 10000); await done;
-    st.getTracks().forEach(t=>t.stop()); btn.classList.remove('shz-on'); btn.parentNode.classList.remove('shz-on');
-    if(shzCancel || !shzRun) return false;
-    const wav = await toWav(new Blob(ch,{type:rec.mimeType}));
-    if(wav.rms < 0.01){ say('Son trop faible : rapprochez-vous de la source.'); return false; }
-    say('Recherche…');
+    const wav = await toWav(blob);
+    if(wav.rms < 0.005){ if(shzRun) shzSay('Son trop faible : rapprochez-vous de la source.'); return; }
     const res = await fetch(SUPABASE_URL+'/functions/v1/identify', {method:'POST', headers:{...SUPABASE_HEADERS,'Content-Type':'audio/wav'}, body:wav}), j = await res.json(), r = j && j.result;
     shzErr = j && j.status==='error' && j.error ? String(j.error.error_message||j.error.error_code) : '';
-    if(!r){ say('Écoute en cours…'); return false; }
+    if(!r || !shzRun) return;
     const ck = (r.title+'|'+r.artist).toLowerCase(); shzVotes[ck] = (shzVotes[ck]||0)+1;
-    if(shzVotes[ck] < 2){ say('Vérification : « '+r.title+' » ?'); return false; }
-    shzVotes = {};
+    if(shzVotes[ck] < 2){ shzSay('Vérification : « '+r.title+' » ?'); return; }
+    shzVotes = {}; shzHit = true; if(!shzAuto){ shzRun = false; if(shzRec && shzRec.state!=='inactive') shzRec.stop(); }
     const L = foundList().filter(x=>!(x.t===r.title && x.a===r.artist));
     L.unshift({t:r.title, a:r.artist, cover:(r.apple_music && r.apple_music.artwork && r.apple_music.artwork.url || '').replace('{w}','200').replace('{h}','200'), apple:r.apple_music && r.apple_music.url || '', d:new Date().toISOString().slice(0,10)});
     try{ localStorage.setItem('pm_found', JSON.stringify(L.slice(0,200))); }catch(e){}
-    say('✅ '+r.title+' — '+r.artist); const f = document.getElementById('shzFound'); if(f) f.innerHTML = foundHTML();
-    return true;
-  }catch(e){ btn.classList.remove('shz-on'); btn.parentNode.classList.remove('shz-on'); shzRun = false; say(e && e.name==='NotAllowedError' ? 'Autorisation du micro refusée : autorisez-le dans le navigateur.' : 'Erreur : '+(e && e.message || e)); return false; }
+    shzSay('✅ '+r.title+' — '+r.artist); const f = document.getElementById('shzFound'); if(f) f.innerHTML = foundHTML();
+  }catch(e){ shzErr = String(e && e.message || e); }
 }
 async function loadArtistStats(){
   const name = state.radarArtist;
