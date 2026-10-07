@@ -3403,11 +3403,10 @@ function openArtistStats(name){
   state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; state.statsTab = 'overview'; renderView();
 }
 async function artistEventsHTML(name){
-  const h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
-  let ac = '';
-  const evt = await fetchSC(name, '/api/v2/artist/{uuid}/events?limit=100');
-  if(evt && (evt.data.items||[]).length) ac += h('🎪 Événements / festivals') + evt.data.items.filter(x=>String(x.startDate||x.date||'').slice(0,10)>=new Date().toISOString().slice(0,10)).sort((a,b)=>String(a.startDate||a.date).localeCompare(String(b.startDate||b.date))).slice(0,30).map(x=>`<div class="alert-item"><div class="aic">🎪</div><div><div class="at">${esc(x.name||x.eventName||'')}</div><div class="ad">${esc([x.cityName,x.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.startDate||x.date||'').slice(0,10))}</div></div></div>`).join('');
-  return ac;
+  const h = t=>`<div class="section-title"><h2>${t}</h2></div>`, today = new Date().toISOString().slice(0,10);
+  const evt = await fetchSC(name, `/api/v2/artist/{uuid}/events?type=all&sortBy=date&sortOrder=asc&startDate=${today}&endDate=${(+today.slice(0,4)+2)+today.slice(4)}&limit=50`), it = evt ? (evt.data.items||[]) : [];
+  if(!it.length) return '';
+  return h('🎪 Événements / festivals à venir') + it.map(x=>{ const v = x.venue||{}, f = x.festival; return `<div class="alert-item"><div class="aic">${x.type==='festival'?'🎪':'🎤'}</div><div><div class="at">${esc(x.name||'')}</div><div class="ad">${esc([v.name, v.cityName, v.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.date||'').slice(0,10))}</div></div></div>`; }).join('');
 }
 /* ---------------------------- IDENTIFIER (style Shazam) ----------------------------
    Micro → 8 s → fonction Supabase `identify` (AudD) → morceau ajouté au dossier « Morceaux trouvés » (gardé sur l'appareil). */
