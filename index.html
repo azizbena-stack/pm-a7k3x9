@@ -2808,7 +2808,7 @@ function renderView(){
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
   else if(state.view==='playlists') c.innerHTML = renderPlaylists();
-  else if(state.view==='radar'){ if(!isPro()){ c.innerHTML = `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>${tr('radar.title')}</div></div></div><div class="hpad" style="margin-top:40px;"><div class="card" style="text-align:center;"><div style="font-size:34px;">📡🔒</div><h3 style="margin:10px 0 6px;">Radar réservé aux membres Premium</h3><p style="color:var(--text-muted);font-size:12.5px;line-height:1.6;">Suivez vos favoris, cherchez n'importe quel artiste et consultez ses statistiques détaillées.</p><button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="open-paywall">🔓 Débloquer Premium</button></div></div>`; } else { c.innerHTML = renderRadar(); loadRadar(); } }
+  else if(state.view==='radar'){ c.innerHTML = renderRadar(); loadRadar(); }
   else if(state.view==='profile') c.innerHTML = renderProfile();
   c.scrollTop = 0;
 }
@@ -3296,7 +3296,7 @@ function renderRadar(){
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('radar.title')}</div></div>
-    <div class="radar-tabs">${tab('mine','🎤 Mes artistes')}${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}</div>
+    <div class="radar-tabs">${tab('mine','🎤 Mes artistes')}${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}${tab('activity','📰 Activité')}${tab('shazam','🎵 Shazam')}</div>
   </div>
   ${t==='search' ? `<div class="hpad" style="margin:8px 0;"><input id="radarInp" type="search" placeholder="Artiste ou morceau : où est-il classé ?" oninput="renderRadarSearch()" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"></div>` : ''}
   <div id="radarBody"><div class="empty-msg">Chargement…</div></div>
@@ -3306,6 +3306,8 @@ async function loadRadar(){
   if(state.radarArtist){ loadArtistStats(); return; }
   const t = state.radarTab;
   if(t==='search'){ renderRadarSearch(); return; }
+  if(t==='shazam'){ renderShazam(); return; }
+  if(t==='activity'){ const m = myArtists(), host = document.getElementById('radarBody'); if(!m.length){ if(host) host.innerHTML = '<div class="empty-msg">Choisissez votre artiste dans 🔍 Rechercher pour voir son activité récente et ses événements.</div>'; return; } const parts = await Promise.all(m.map(n=>artistActivityHTML(n))); if(host && state.view==='radar' && state.radarTab===t && !state.radarArtist) host.innerHTML = m.map((n,k)=>`<div style="padding:10px 18px 0;font-weight:800;">📊 ${esc(n)}</div>`+(parts[k]||'<div class="empty-msg">Aucune activité récente.</div>')).join(''); return; }
   if(t==='mine'){ const m = myArtists(), host = document.getElementById('radarBody'); if(host) host.innerHTML = m.length ? m.map(n=>`<div style="padding:10px 18px;"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">${esc(n)}${state.user && normText(n)===normText(state.user.artistName) ? ' <span style="font-size:10px;color:var(--text-muted);">(mon artiste)</span>' : ''}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span></div></div>`).join('') + '<div class="empty-msg">Pour ajouter un autre artiste : 🔍 Rechercher (payant, '+EXTRA_ARTIST_PRICE+' / mois par artiste).</div>' : '<div class="empty-msg">Aucun artiste suivi.<br>Allez dans 🔍 Rechercher, trouvez votre artiste et choisissez-le : il est inclus dans Premium. 📡</div>'; return; }
   const rows = await loadRadarRows();
   const html = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
@@ -3400,10 +3402,53 @@ function openArtistBuy(name){
     <p style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:12px;">${tr('paywall.labelOffer')}</p></div>`;
 }
 function openArtistStats(name){
-  if(!isPro()){ openPaywall(); return; }
-  if(!ownsArtist(name)){ openArtistBuy(name); return; }
   const ov = document.getElementById('searchOv'); if(ov) ov.classList.add('hidden');
   state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; state.statsTab = 'overview'; renderView();
+}
+async function artistActivityHTML(name){
+  const h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
+  let ac = '';
+  const [ev1, ev2, ev3, ev4, ev5] = await Promise.all([
+    fetchSC(name, '/api/v2.20/artist/{uuid}/playlist/current/spotify?currentOnly=0&limit=15&sortBy=entryDate&sortOrder=desc'),
+    ...['spotify','apple-music','beatport','shazam'].map(c=>fetchSC(name, `/api/v2/artist/{uuid}/charts/song/ranks/${c}?currentOnly=0&limit=15&sortBy=rankDate&sortOrder=desc`))]);
+  const evs = [];
+  (ev1 ? ev1.data.items||[] : []).forEach(x=>evs.push({d:x.entryDate, i:'📻', t:'Ajouté à la playlist « '+x.playlist.name+' »', s:fmtNum(x.playlist.latestSubscriberCount)+' abonnés · '+x.song.name}));
+  [['spotify',ev2],['apple-music',ev3],['beatport',ev4],['shazam',ev5]].forEach(([pf2,e])=>(e ? e.data.items||[] : []).forEach(x=>evs.push({d:x.rankDate, i:'🏆', t:'#'+x.position+' · '+x.chart.name+(x.chart.cityName ? ' ('+x.chart.cityName+')' : x.chart.countryName ? ' ('+x.chart.countryName+')' : ''), s:pname(pf2)+' · '+x.song.name+(x.positionEvolution ? ' · '+(x.positionEvolution>0?'▲':'▼')+Math.abs(x.positionEvolution) : '')})));
+  evs.sort((a,b)=>String(b.d).localeCompare(String(a.d)));
+  if(evs.length) ac = h('🔔 Activités récentes') + evs.slice(0,15).map(x=>`<div class="alert-item"><div class="aic">${x.i}</div><div><div class="at">${esc(x.t)}</div><div class="ad">${esc(x.s)}</div><div class="atime">${esc(String(x.d).slice(0,10))}</div></div></div>`).join('');
+  const evt = await fetchSC(name, '/api/v2/artist/{uuid}/events?limit=10');
+  if(evt && (evt.data.items||[]).length) ac += h('🎪 Événements / festivals') + evt.data.items.slice(0,10).map(x=>`<div class="alert-item"><div class="aic">🎪</div><div><div class="at">${esc(x.name||x.eventName||'')}</div><div class="ad">${esc([x.cityName,x.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.startDate||x.date||'').slice(0,10))}</div></div></div>`).join('');
+  return ac;
+}
+/* ---------------------------- IDENTIFIER (style Shazam) ----------------------------
+   Micro → 8 s → fonction Supabase `identify` (AudD) → morceau ajouté au dossier « Morceaux trouvés » (gardé sur l'appareil). */
+const foundList = () => { try{ return JSON.parse(localStorage.getItem('pm_found'))||[]; }catch(e){ return []; } };
+function foundHTML(){
+  const L = foundList();
+  return `<div class="section-title"><h2>📁 Morceaux trouvés (${L.length})</h2></div>` + (L.length ? L.map((x,i)=>`<div class="alert-item">${x.cover ? `<img src="${esc(x.cover)}" alt="" referrerpolicy="no-referrer" style="width:46px;height:46px;border-radius:8px;object-fit:cover;">` : '<div class="aic">🎵</div>'}<div style="flex:1;min-width:0;"><div class="at">${esc(x.t)}</div><div class="ad">${esc(x.a)}</div><div class="atime">${esc(x.d)}</div><div class="chiprow" style="padding:6px 0 0;flex-wrap:wrap;overflow:visible;">${platformLinks(x.a+' '+x.t, x.apple)}<span class="chip" data-action="found-del" data-i="${i}">🗑</span></div></div></div>`).join('') : '<div class="empty-msg">Aucun morceau trouvé pour l\'instant. Touchez le bouton pour identifier un titre.</div>');
+}
+function renderShazam(){
+  const host = document.getElementById('radarBody'); if(!host) return;
+  host.innerHTML = `<style>@keyframes shz{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.9);opacity:0}}.shz-on::before,.shz-on::after{content:"";position:absolute;inset:0;border-radius:50%;background:#0a84ff;animation:shz 1.6s infinite}.shz-on::after{animation-delay:.8s}</style>
+  <div style="text-align:center;padding:26px 0 8px;"><div style="position:relative;width:150px;height:150px;margin:0 auto;"><div id="shzBtn" data-action="shazam-listen" style="position:relative;z-index:1;width:150px;height:150px;border-radius:50%;background:linear-gradient(135deg,#0a84ff,#4cc2ff);display:flex;align-items:center;justify-content:center;font-size:56px;cursor:pointer;box-shadow:0 8px 30px #0a84ff66;">🎵</div></div>
+  <div id="shzMsg" style="margin-top:16px;font-weight:800;font-size:14px;">Touchez pour identifier un morceau</div></div>
+  <div id="shzFound">${foundHTML()}</div>`;
+}
+async function shazamListen(){
+  const btn = document.getElementById('shzBtn'), msg = document.getElementById('shzMsg'); if(!btn || btn.classList.contains('shz-on')) return;
+  const say = t => { if(msg) msg.textContent = t; };
+  try{
+    const st = await navigator.mediaDevices.getUserMedia({audio:true}), rec = new MediaRecorder(st), ch = [];
+    rec.ondataavailable = e=>ch.push(e.data); btn.parentNode.classList.add('shz-on'); btn.classList.add('shz-on'); say('Écoute en cours…');
+    const done = new Promise(r=>rec.onstop=r); rec.start(); setTimeout(()=>rec.state!=='inactive' && rec.stop(), 8000); await done;
+    st.getTracks().forEach(t=>t.stop()); btn.classList.remove('shz-on'); say('Recherche…');
+    const res = await fetch(SUPABASE_URL+'/functions/v1/identify', {method:'POST', headers:{...SUPABASE_HEADERS,'Content-Type':rec.mimeType||'audio/webm'}, body:new Blob(ch,{type:rec.mimeType})}), j = await res.json(), r = j && j.result;
+    if(!r){ say('Morceau non reconnu. Rapprochez-vous de la source et réessayez.'); return; }
+    const L = foundList().filter(x=>!(x.t===r.title && x.a===r.artist));
+    L.unshift({t:r.title, a:r.artist, cover:(r.apple_music && r.apple_music.artwork && r.apple_music.artwork.url || '').replace('{w}','200').replace('{h}','200'), apple:r.apple_music && r.apple_music.url || '', d:new Date().toISOString().slice(0,10)});
+    try{ localStorage.setItem('pm_found', JSON.stringify(L.slice(0,200))); }catch(e){}
+    say('✅ '+r.title+' — '+r.artist); const f = document.getElementById('shzFound'); if(f) f.innerHTML = foundHTML();
+  }catch(e){ btn.classList.remove('shz-on'); say('Micro indisponible ou autorisation refusée.'); }
 }
 async function loadArtistStats(){
   const name = state.radarArtist;
@@ -3433,10 +3478,8 @@ async function loadArtistStats(){
   const meta = await fetchSC(name, '/api/v2.9/artist/{uuid}'), mo = meta && meta.data && meta.data.object;
   const head = !mo ? '' : `<div class="hpad" style="margin:10px 0;display:flex;gap:12px;align-items:center;">${mo.imageUrl ? `<img src="${esc(mo.imageUrl)}" alt="" referrerpolicy="no-referrer" style="width:64px;height:64px;border-radius:50%;object-fit:cover;">` : ''}<div style="min-width:0;"><div style="font-weight:800;font-size:15px;">${esc(mo.name)} ${mo.countryCode ? flagOf(mo.countryCode) : ''}</div><div style="font-size:11px;color:var(--text-muted);">${esc((mo.genres||[]).map(g=>g.root).filter(Boolean).join(' · '))}${mo.type ? ' · '+esc(mo.type) : ''}</div>${mo.biography ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:4px;line-height:1.4;">${esc(mo.biography.slice(0,170))}${mo.biography.length>170?'…':''}</div>` : ''}</div></div>`;
   // Vue d'ensemble (Soundcharts « current/stats ») + fil d'activités
-  const [cs, ev1, ev2, ev3, ev4, ev5] = await Promise.all([fetchSC(name, '/api/v2/artist/{uuid}/current/stats'),
-    fetchSC(name, '/api/v2.20/artist/{uuid}/playlist/current/spotify?currentOnly=0&limit=15&sortBy=entryDate&sortOrder=desc'),
-    ...['spotify','apple-music','beatport','shazam'].map(c=>fetchSC(name, `/api/v2/artist/{uuid}/charts/song/ranks/${c}?currentOnly=0&limit=15&sortBy=rankDate&sortOrder=desc`))]);
-  let ov = '', ac = '';
+  const cs = await fetchSC(name, '/api/v2/artist/{uuid}/current/stats');
+  let ov = '';
   const o = cs && cs.data;
   if(o){
     const T = (arr, lab, f) => (arr||[]).length ? `<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:10px 18px 4px;">${lab}</div>` + tiles(arr.map(f)) : '';
@@ -3444,17 +3487,10 @@ async function loadArtistStats(){
       + T(o.streaming, 'ÉCOUTES / VUES (28 J)', x=>statTile(fmtNum(x.value), pname(x.platform), x.evolution))
       + T(o.popularity, 'POPULARITÉ', x=>statTile(x.value+'/100', pname(x.platform), x.evolution))
       + T(o.retention, 'ÉCOUTES PAR AUDITEUR', x=>statTile(x.value.toFixed(1), pname(x.platform)))
-      + T((o.score||[]).filter(x=>x.type), 'SCORE SOUNDCHARTS', x=>statTile(fmtNum(x.value), ({sc_score:'score',sc_fanbase:'fanbase',sc_trending:'tendance'})[x.type]||x.type, x.evolution))
+      + T((o.score||[]).filter(x=>x.type), 'SCORE', x=>statTile(fmtNum(x.value), ({sc_score:'score',sc_fanbase:'fanbase',sc_trending:'tendance'})[x.type]||x.type, x.evolution))
       + T(o.ranks, 'RANG D\'ARTISTE', x=>statTile('#'+fmtNum(x.position), (x.countryCode ? flagOf(x.countryCode)+' ' : '🌍 ')+(x.genre||'tous genres'), -x.positionEvolution));
   }
-  const evs = [];
-  (ev1 ? ev1.data.items||[] : []).forEach(x=>evs.push({d:x.entryDate, i:'📻', t:'Ajouté à la playlist « '+x.playlist.name+' »', s:fmtNum(x.playlist.latestSubscriberCount)+' abonnés · '+x.song.name}));
-  [['spotify',ev2],['apple-music',ev3],['beatport',ev4],['shazam',ev5]].forEach(([pf2,e])=>(e ? e.data.items||[] : []).forEach(x=>evs.push({d:x.rankDate, i:'🏆', t:'#'+x.position+' · '+x.chart.name+(x.chart.cityName ? ' ('+x.chart.cityName+')' : x.chart.countryName ? ' ('+x.chart.countryName+')' : ''), s:pname(pf2)+' · '+x.song.name+(x.positionEvolution ? ' · '+(x.positionEvolution>0?'▲':'▼')+Math.abs(x.positionEvolution) : '')})));
-  evs.sort((a,b)=>String(b.d).localeCompare(String(a.d)));
-  if(evs.length) ac = h('🔔 Activités récentes') + evs.slice(0,15).map(x=>`<div class="alert-item"><div class="aic">${x.i}</div><div><div class="at">${esc(x.t)}</div><div class="ad">${esc(x.s)}</div><div class="atime">${esc(String(x.d).slice(0,10))}</div></div></div>`).join('');
-  const evt = await fetchSC(name, '/api/v2/artist/{uuid}/events?limit=10');
-  if(evt && (evt.data.items||[]).length) ac += h('🎪 Événements / festivals') + evt.data.items.slice(0,10).map(x=>`<div class="alert-item"><div class="aic">🎪</div><div><div class="at">${esc(x.name||x.eventName||'')}</div><div class="ad">${esc([x.cityName,x.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.startDate||x.date||'').slice(0,10))}</div></div></div>`).join('');
-  out = head + ov + ac + out;
+  out = head + ov + out;
   const iB = out.length; // début de l'onglet Audience
   const PF = {
     spotify:['🟢 Spotify','#1db954',{chart:'spotify',pl:'spotify',st:'spotify',au:'spotify'}], youtube:['🔴 YouTube','#ff3b3b',{pl:'youtube',st:'youtube',au:'youtube'}],
@@ -4261,6 +4297,8 @@ document.addEventListener('click', async (e)=>{
     if(state.exploreOpenCityId) loadExploreCityList(state.exploreOpenCityId);
   }
   else if(a==='radar-tab'){ state.radarTab = el.dataset.t; state.radarArtist = null; renderView(); }
+  else if(a==='shazam-listen'){ shazamListen(); }
+  else if(a==='found-del'){ const L = foundList(); L.splice(+el.dataset.i,1); try{ localStorage.setItem('pm_found', JSON.stringify(L)); }catch(e){} const f = document.getElementById('shzFound'); if(f) f.innerHTML = foundHTML(); }
   else if(a==='radar-back'){ state.radarArtist = null; renderView(); }
   else if(a==='stats-tab'){ state.statsTab = el.dataset.t; loadArtistStats(); }
   else if(a==='stats-range'){ state.statsRange = el.dataset.r; loadArtistStats(); }
