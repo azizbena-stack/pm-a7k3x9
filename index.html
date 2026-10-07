@@ -3426,6 +3426,16 @@ function renderShazam(){
   <div id="shzMsg" style="margin-top:16px;font-weight:800;font-size:14px;">Touchez pour identifier un morceau</div><div id="shzAuto" style="margin-top:6px;font-size:11px;color:var(--text-muted);">Double-touchez le logo pour le mode automatique</div></div>
   <div id="shzFound">${foundHTML()}</div>`;
 }
+// AudD lit mal le webm/opus du navigateur : on convertit l'enregistrement en WAV 16 kHz mono.
+async function toWav(blob){
+  const ctx = new (window.AudioContext||window.webkitAudioContext)(), buf = await ctx.decodeAudioData(await blob.arrayBuffer()); if(ctx.close) ctx.close();
+  const sr = 16000, off = new OfflineAudioContext(1, Math.max(1,Math.ceil(buf.duration*sr)), sr), src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
+  const pcm = (await off.startRendering()).getChannelData(0), n = pcm.length, v = new DataView(new ArrayBuffer(44+n*2)), w = (o,t)=>[...t].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+  w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVEfmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true); v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++) v.setInt16(44+i*2, Math.max(-1,Math.min(1,pcm[i]))*0x7fff, true);
+  return new Blob([v],{type:'audio/wav'});
+}
+let shzErr = '';
 let shzAuto = false, shzRun = false, shzRec = null, shzCancel = false, shzLast = 0, shzDeadline = 0;
 const shzSay = t => { const m = document.getElementById('shzMsg'); if(m) m.textContent = t; };
 const shzAutoTxt = () => { const a = document.getElementById('shzAuto'); if(a) a.textContent = shzAuto ? '🔁 Mode automatique — touchez le logo pour arrêter' : 'Double-touchez le logo pour le mode automatique'; };
@@ -3439,7 +3449,7 @@ async function shazamListen(){
     while(shzRun){
       const ok = await shazamOnce(); if(!shzRun) break;
       if(ok){ shzDeadline = Date.now()+45000; if(!shzAuto) break; await new Promise(r=>setTimeout(r,2500)); }
-      else if(Date.now()>=shzDeadline){ shzSay('Aucun titre trouvé'); break; }
+      else if(Date.now()>=shzDeadline){ shzSay('Aucun titre trouvé' + (shzErr ? ' ('+shzErr.slice(0,90)+')' : '')); break; }
     }
   }finally{ shzRun = false; shzAuto = false; shzAutoTxt(); }
 }
@@ -3454,7 +3464,8 @@ async function shazamOnce(){
     st.getTracks().forEach(t=>t.stop()); btn.classList.remove('shz-on'); btn.parentNode.classList.remove('shz-on');
     if(shzCancel || !shzRun) return false;
     say('Recherche…');
-    const res = await fetch(SUPABASE_URL+'/functions/v1/identify', {method:'POST', headers:{...SUPABASE_HEADERS,'Content-Type':rec.mimeType||'audio/webm'}, body:new Blob(ch,{type:rec.mimeType})}), j = await res.json(), r = j && j.result;
+    const res = await fetch(SUPABASE_URL+'/functions/v1/identify', {method:'POST', headers:{...SUPABASE_HEADERS,'Content-Type':'audio/wav'}, body:await toWav(new Blob(ch,{type:rec.mimeType}))}), j = await res.json(), r = j && j.result;
+    shzErr = j && j.status==='error' && j.error ? String(j.error.error_message||j.error.error_code) : '';
     if(!r){ say('Écoute en cours…'); return false; }
     const L = foundList().filter(x=>!(x.t===r.title && x.a===r.artist));
     L.unshift({t:r.title, a:r.artist, cover:(r.apple_music && r.apple_music.artwork && r.apple_music.artwork.url || '').replace('{w}','200').replace('{h}','200'), apple:r.apple_music && r.apple_music.url || '', d:new Date().toISOString().slice(0,10)});
