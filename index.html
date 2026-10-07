@@ -3405,7 +3405,11 @@ function openArtistStats(name){
 async function artistEventsHTML(name){
   const h = t=>`<div class="section-title"><h2>${t}</h2></div>`, today = new Date().toISOString().slice(0,10);
   const evt = await fetchSC(name, `/api/v2/artist/{uuid}/events?type=all&sortBy=date&sortOrder=asc&startDate=${today}&endDate=${(+today.slice(0,4)+2)+today.slice(4)}&limit=50`), it = evt ? (evt.data.items||[]) : [];
-  if(!it.length) return '';
+  if(!it.length){
+    // Soundcharts n'a rien : on complète avec Ticketmaster (fonction Supabase `events`)
+    let tm = []; try{ tm = (await (await fetch(SUPABASE_URL+'/functions/v1/events?name='+encodeURIComponent(name), {headers:SUPABASE_HEADERS})).json()).items || []; }catch(e){}
+    return tm.length ? h('🎪 Événements à venir (Ticketmaster)') + tm.map(x=>`<div class="alert-item"><div class="aic">🎤</div><div><div class="at">${esc(x.name)}</div><div class="ad">${esc([x.venue, x.city, x.country].filter(Boolean).join(', '))}</div><div class="atime">${esc(x.date)}</div>${x.url ? `<div class="chiprow" style="padding:6px 0 0;"><a class="chip" href="${esc(x.url)}" target="_blank" rel="noopener">🎟️ Billets</a></div>` : ''}</div></div>`).join('') : '';
+  }
   return h('🎪 Événements / festivals à venir') + it.map(x=>{ const v = x.venue||{}, f = x.festival; return `<div class="alert-item"><div class="aic">${x.type==='festival'?'🎪':'🎤'}</div><div><div class="at">${esc(x.name||'')}</div><div class="ad">${esc([v.name, v.cityName, v.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.date||'').slice(0,10))}</div></div></div>`; }).join('');
 }
 /* ---------------------------- IDENTIFIER (style Shazam) ----------------------------
