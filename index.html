@@ -3295,7 +3295,7 @@ function renderRadar(){
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('radar.title')}</div></div>
-    <div class="radar-tabs">${tab('mine','🎤 Mes artistes')}${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}${tab('events','🎪 Événements')}</div>
+    <div class="radar-tabs">${tab('mine','🎤 Mes artistes')}${tab('saved','♥ Suivis ('+n+')')}${tab('search','🔍 Rechercher')}${tab('alerts',tr('radar.alertsTab'))}</div>
   </div>
   ${t==='search' ? `<div class="hpad" style="margin:8px 0;"><input id="radarInp" type="search" placeholder="Artiste ou morceau : où est-il classé ?" oninput="renderRadarSearch()" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"></div>` : ''}
   <div id="radarBody"><div class="empty-msg">Chargement…</div></div>
@@ -3305,7 +3305,6 @@ async function loadRadar(){
   if(state.radarArtist){ loadArtistStats(); return; }
   const t = state.radarTab;
   if(t==='search'){ renderRadarSearch(); return; }
-  if(t==='events'){ renderEvents(); return; }
   if(t==='mine'){ const m = myArtists(), host = document.getElementById('radarBody'); if(host) host.innerHTML = m.length ? m.map(n=>`<div style="padding:10px 18px;"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">${esc(n)}${state.user && normText(n)===normText(state.user.artistName) ? ' <span style="font-size:10px;color:var(--text-muted);">(mon artiste)</span>' : ''}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span><span class="chip" data-action="del-artist" data-n="${esc(n)}">✕ Retirer</span></div></div>`).join('') + '<div class="empty-msg">Pour ajouter un autre artiste : 🔍 Rechercher (payant, '+EXTRA_ARTIST_PRICE+' / mois par artiste).</div>' : '<div class="empty-msg">Aucun artiste suivi.<br>Allez dans 🔍 Rechercher, trouvez votre artiste et choisissez-le : il est inclus dans Premium. 📡</div>'; return; }
   const rows = await loadRadarRows();
   const html = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
@@ -3402,19 +3401,6 @@ function openArtistBuy(name){
 function openArtistStats(name){
   const ov = document.getElementById('searchOv'); if(ov) ov.classList.add('hidden');
   state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; state.statsTab = 'overview'; renderView();
-}
-async function renderEvents(){
-  const host = document.getElementById('radarBody'); if(!host) return;
-  host.innerHTML = '<div class="hpad" style="margin:8px 0;"><input id="evInp" type="search" placeholder="Nom d\'un artiste (même hors classement)" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:16px;"></div><div id="evOut"></div>';
-  const inp = document.getElementById('evInp'), out = document.getElementById('evOut');
-  const show = async names => {
-    out.innerHTML = '<div class="empty-msg">Chargement…</div>';
-    const parts = await Promise.all(names.map(n=>artistEventsHTML(n)));
-    if(!document.getElementById('evOut')) return;
-    out.innerHTML = names.map((n,k)=>`<div style="padding:10px 18px 0;font-weight:800;">🎤 ${esc(n)}</div>`+(parts[k]||'<div class="empty-msg">Aucun événement à venir trouvé.</div>')).join('') || '<div class="empty-msg">Tapez un artiste et validez : ses prochains événements et festivals s\'affichent.</div>';
-  };
-  inp.addEventListener('keydown', e=>{ if(e.key==='Enter' && inp.value.trim().length>=2) show([inp.value.trim()]); });
-  const m = myArtists(); if(m.length) show(m); else out.innerHTML = '<div class="empty-msg">Tapez un artiste et validez : ses prochains événements et festivals s\'affichent.</div>';
 }
 async function artistEventsHTML(name){
   const h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
@@ -3600,8 +3586,8 @@ async function loadArtistStats(){
   if(sg && (sg.data.items||[]).length) out += h('🎼 Catalogue ('+(sg.data.page && sg.data.page.total || sg.data.items.length)+' titres)') + sg.data.items.map(x=>`<div class="alert-item"><div class="aic">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="width:40px;height:40px;border-radius:8px;object-fit:cover;">` : '🎵'}</div><div><div class="at">${esc(x.name)}</div><div class="ad">${esc(x.creditName||'')}</div></div></div>`).join('');
   out += h('🔗 Voir l\'artiste') + `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;">${platformLinks(name, cat && cat[0] && cat[0].artistViewUrl)}</div>`
     + '<div class="hpad" style="font-size:10px;color:var(--text-muted);margin-top:14px;line-height:1.5;">Sources : classements Beatport / Apple Music via Soundcharts, catalogue public Apple Music (200 titres maximum). Écoutes et abonnés : bientôt, selon les accords de données.</div>';
-  const tb = state.statsTab || 'overview', tab = (k,l)=>`<span class="chip ${k===tb?'active':''}" data-action="stats-tab" data-t="${k}">${l}</span>`;
-  host.innerHTML = `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;margin-top:8px;">${tab('overview','📊 Vue d\'ensemble')}${tab('audience','🎧 Audience')}${tab('catalog','🎼 Catalogue')}</div>` + (tb==='audience' ? out.slice(iB, iC) : tb==='catalog' ? out.slice(iC) : out.slice(0, iB));
+  const tb = state.statsTab || 'overview', evH = tb==='events' ? ((await artistEventsHTML(name)) || '<div class="empty-msg">Aucun événement à venir trouvé.</div>') : '', tab = (k,l)=>`<span class="chip ${k===tb?'active':''}" data-action="stats-tab" data-t="${k}">${l}</span>`;
+  host.innerHTML = `<div class="hpad chiprow" style="flex-wrap:wrap;overflow:visible;margin-top:8px;">${tab('overview','📊 Vue d\'ensemble')}${tab('audience','🎧 Audience')}${tab('events','🎪 Événements')}${tab('catalog','🎼 Catalogue')}</div>` + (tb==='events' ? evH : tb==='audience' ? out.slice(iB, iC) : tb==='catalog' ? out.slice(iC) : out.slice(0, iB));
 }
 
 function radarSavedHTML(rows){
