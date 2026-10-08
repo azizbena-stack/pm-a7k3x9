@@ -667,7 +667,7 @@ function renderPlaylists(){
   if(!isPro()) return head + `<div class="hpad" style="margin-top:40px;"><div class="card" style="text-align:center;"><div style="font-size:34px;">🎵🔒</div><h3 style="margin:10px 0 6px;">Playlists réservées aux membres Premium</h3><p style="color:var(--text-muted);font-size:12.5px;line-height:1.6;">Créez vos playlists et ajoutez-y vos morceaux préférés.</p><button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="open-paywall">🔓 Débloquer Premium</button></div></div>`;
   if(plOpen && plMap[plOpen]){
     const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div><span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
-    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div>${playSourceHTML()}<div class="hpad" style="display:flex;gap:8px;margin:8px 0 10px;"><button class="btn" data-action="pl-yt" style="flex:1;">🔗 Lien YouTube de la playlist</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
+    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div><div class="hpad" style="display:flex;gap:8px;margin:8px 0 10px;"><button class="btn" data-action="pl-yt" style="flex:1;">🔗 Lien YouTube de la playlist</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
   }
   const names = Object.keys(plMap);
   return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><input id="plName" placeholder="Nom de la playlist" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"><button class="btn btn-primary" data-action="pl-create">Créer</button></div>`
@@ -2671,7 +2671,7 @@ function plQStart(name, shuffle){
   djAutoStop(true); plQ = {items, i:0, dir:1, err:0}; plQPlay();
 }
 async function plQPlay(tries){
-  const q = plQ; if(!q) return; tries = tries||0; const n = q.items.length, f = q.items[((q.i%n)+n)%n], apple = getPlaySource()==='apple', yt = ytLookup(f.title, f.artist);
+  const q = plQ; if(!q) return; tries = tries||0; const n = q.items.length, f = q.items[((q.i%n)+n)%n], apple = false, yt = ytLookup(f.title, f.artist); // lecture intégrée : YouTube seulement
   const skip = msg => { if(tries>=n){ plQ = null; stopPlayback(); toast(msg); return; } q.i += q.dir; plQPlay(tries+1); };
   if(!apple && !yt) return skip('Aucun titre avec lecteur intégré');
   const id = 'plq:'+f.title+'|'+f.artist;
@@ -3665,16 +3665,17 @@ function djBeat(d, t){
 function djPhase(k, soft){ // cale les pulsations de la platine k sur celles de l'autre ; renvoie l'écart en secondes
   const d = DJ[k], o = DJ[k==='A'?'B':'A']; if(!d || !o || d.yt || o.yt || !d.on || !o.on || !d.bpm || !o.bpm) return 0;
   const f = x => (x.a.currentTime-djBeat(x, x.a.currentTime))/(60/x.bpm); let e = f(o)-f(d); e -= Math.round(e);
-  const sec = e*60/d.bpm;
-  if(soft && Math.abs(sec)<0.12){ d.a.playbackRate = d.pv*(1+Math.max(-.03,Math.min(.03,sec))); return sec; }
-  d.a.playbackRate = d.pv; if(Math.abs(sec)>0.012) d.a.currentTime += sec; return sec;
+  let sec = e*60/d.bpm;
+  if(soft){ const h = d.eh = (d.eh||[]).concat(sec).slice(-3); sec = [...h].sort((a,b)=>a-b)[h.length>>1]; } // médiane : ignore une mesure aberrante
+  if(soft && Math.abs(sec)<0.25){ d.a.playbackRate = d.pv*(1+Math.max(-.04,Math.min(.04,sec*0.6))); return sec; }
+  d.eh = []; d.a.playbackRate = d.pv; if(Math.abs(sec)>0.012) d.a.currentTime += sec; return sec;
 }
 function djSnap(d, t){ if(!d || !d.q || !d.on || !d.bpm) return t; const P = 60/d.bpm, b = djBeat(d, t); return Math.max(0, b+Math.round((t-b)/P)*P); }
 function djQuant(k){ const d = djDeck(k); d.q = !d.q; const e = document.getElementById('djQb'+k); if(e){ e.style.background = d.q?'#22c55e':'#2a2a36'; e.style.color = d.q?'#000':'#fff'; e.textContent = d.q?'QUANT ON':'QUANT OFF'; } toast('Quantize '+k+(d.q?' activé : démarrage et repères calés sur les temps':' désactivé')); }
 setInterval(()=>{ // boucle calée sur un nombre entier de temps + re-verrouillage si dérive > 40 ms
   ['A','B'].forEach(k=>{ const d = DJ[k]; if(!d || d.yt || !d.loopLen || d.a.paused) return; if(d.a.currentTime >= d.off+d.loopLen) d.a.currentTime -= d.loopLen; });
 }, 30);
-setInterval(()=>{ ['A','B'].forEach(k=>{ const d = DJ[k], o = DJ[k==='A'?'B':'A']; if(!d || !d.lock || !o) return; djTempoMatch(k); if(!o.a.paused) djPhase(k, !d.a.paused); }); }, 400);
+setInterval(()=>{ ['A','B'].forEach(k=>{ const d = DJ[k], o = DJ[k==='A'?'B':'A']; if(!d || !d.lock || !o) return; if(k==='A' && o.lock) return; djTempoMatch(k); if(!o.a.paused) djPhase(k, !d.a.paused); }); }, 300);
 function djSet(k, what, v){
   const d = djDeck(k); v = +v;
   if(what==='pv'){ d.pv = v; if(!djSyncing) d.lock = null; d.a.playbackRate = v; const l = document.getElementById('djPl'+k), b = document.getElementById('djB'+k); if(!djSyncing){ djSyncUI(); } if(l) l.textContent = ((v-1)*100).toFixed(1)+'%'; if(b && d.bpm) b.textContent = (d.bpm*v).toFixed(1)+' BPM'; }
