@@ -3598,7 +3598,15 @@ async function djBpm(url){
   let b8 = Math.round(bl*8), bs = 0; for(let L=b8-4; L<=b8+4; L++){ const v = sc(L); if(v>bs){ bs = v; b8 = L; } }
   const Pf = pk(b8)/8; let bo = 0, bv = -1;
   for(let o=0; o<Math.ceil(Pf); o++){ let v = 0; for(let j=0; o+j*Pf<n-1; j++){ const i = Math.round(o+j*Pf); v += on[i]+(on[i+1]||0)+(on[i-1]||0); } if(v>bv){ bv = v; bo = o; } }
-  return {bpm:12000/Pf, off:bo/200, on:onl};
+  // grille fixe façon Rekordbox : BPM affiné et 1er temps ajustés sur TOUT le morceau (kick + attaques), jamais recalculés localement
+  const mx = a=>{ let m = 1e-9; for(let i=0;i<a.length;i++) if(a[i]>m) m = a[i]; return m; }, ml = mx(onl), mf = mx(on), cmb = new Float32Array(n);
+  for(let i=0;i<n;i++) cmb[i] = onl[i]/ml + 0.5*on[i]/mf;
+  const sc2 = (P,o)=>{ let v = 0, c = 0; for(let x=o; x<n-1; x+=P){ const i = Math.round(x); v += cmb[i]+0.5*(cmb[i-1]||0)+0.5*cmb[i+1]; c++; } return c ? v/c : 0; };
+  const b0 = 12000/Pf; let gb = b0, go = bo, gs = -1;
+  for(let b=b0-0.6; b<=b0+0.6; b+=0.02){ const P = 12000/b; for(let o=0; o<P; o++){ const s = sc2(P,o); if(s>gs){ gs = s; gb = b; go = o; } } }
+  const c0 = gb, o0 = go; for(let b=c0-0.02; b<=c0+0.02; b+=0.002){ const P = 12000/b; for(let o=o0-2; o<=o0+2; o+=0.25){ const s = sc2(P,Math.max(0,o)); if(s>gs){ gs = s; gb = b; go = Math.max(0,o); } } }
+  const fs = buf.sampleRate/hop; // fréquence réelle de l'enveloppe (le pas est arrondi : ≠ 200 Hz)
+  return {bpm:gb*fs/200, off:go/fs, on:cmb};
 }
 function djLoad(k, i){ djLoadR(k, djRes[i]); }
 function djLnk(d){ return d && d.yt ? `<a href="https://open.spotify.com/search/${encodeURIComponent(d.t+' '+d.ar)}" target="_blank" rel="noopener" style="font-size:10px;font-weight:800;color:#1db954;text-decoration:none;">🟢 Ouvrir dans Spotify</a>` : ''; }
@@ -3626,8 +3634,8 @@ function djPlay(k){
   if(d.a.paused){ const o = DJ[k==='A'?'B':'A']; if((d.q||d.lock) && o && !o.a.paused) djPhase(k); d.a.play().catch(()=>{}); } else d.a.pause();
   djSpin(k);
 }
-function djCue(k){ const d = DJ[k]; if(d && d.a.src){ d.a.currentTime = 0; } }
-function djSeek(k, v){ const d = DJ[k]; if(d && d.a.duration) d.a.currentTime = v/1000*d.a.duration; }
+function djCue(k){ const d = DJ[k]; if(d && d.a.src){ d.a.currentTime = d.q && d.on ? d.off : 0; } }
+function djSeek(k, v){ const d = DJ[k]; if(d && d.a.duration) d.a.currentTime = djSnap(d, v/1000*d.a.duration); }
 function djPad(k, i){ // 1er appui : mémorise la position ; ensuite : saute dessus
   const d = DJ[k]; if(!d || !d.a.src) return; d.cues = d.cues || {};
   if(d.cues[i]==null){ d.cues[i] = djSnap(d, d.a.currentTime); const e = document.getElementById('djPd'+k+i); if(e) e.style.background = e.style.background.replace(/55\)?$/,''); toast('Repère '+(i+1)+' enregistré'); }
@@ -3657,16 +3665,13 @@ function djSync(k){ // bouton SYNC : active / désactive le verrouillage sur l'a
 function djBpmSet(k, bpm, off){ const d = DJ[k]; if(!d) return; d.bpm = bpm; if(off!=null) d.off = off; if(bpm && d.a.duration && !d.yt){ const P = 60/bpm, n = Math.max(4, Math.floor(((d.a.duration||30)-d.off)/P/16)*16); d.loopLen = n*P; } const e = document.getElementById('djB'+k); if(e) e.textContent = bpm ? (bpm*d.pv).toFixed(1)+' BPM' : '— BPM'; djScale(k); }
 function djBpmEdit(k){ const d = DJ[k]; if(!d || !d.t) return; const v = parseFloat(String(prompt('BPM du titre (tempo normal) :', d.bpm ? d.bpm.toFixed(1) : '')||'').replace(',','.')); if(v>50 && v<250) djBpmSet(k, v); }
 // pulsation proche de t : on ajuste la grille de temps sur l'enveloppe locale (±8 s), donc pas de dérive même si le BPM global est un peu faux
-function djBeat(d, t){
-  const on = d.on, P = 12000/d.bpm, c = Math.round(t*200), lo = Math.max(1, c-1600), hi = Math.min(on.length-2, c+1600);
-  let bo = 0, bv = -1; for(let o=0; o<P; o+=0.5){ let v = 0; for(let x=lo+o; x<hi; x+=P){ const i = Math.round(x); v += on[i]+on[i-1]+on[i+1]; } if(v>bv){ bv = v; bo = o; } }
-  return (lo+bo)/200;
-}
+function djBeat(d, t){ const P = 60/d.bpm; return d.off + Math.floor((t-d.off)/P)*P; } // grille fixe (BPM + 1er temps), comme Rekordbox
 function djPhase(k, soft){ // cale les pulsations de la platine k sur celles de l'autre ; renvoie l'écart en secondes
   const d = DJ[k], o = DJ[k==='A'?'B':'A']; if(!d || !o || d.yt || o.yt || !d.on || !o.on || !d.bpm || !o.bpm) return 0;
   const f = x => (x.a.currentTime-djBeat(x, x.a.currentTime))/(60/x.bpm); let e = f(o)-f(d); e -= Math.round(e);
   let sec = e*60/d.bpm;
   if(soft){ const h = d.eh = (d.eh||[]).concat(sec).slice(-3); sec = [...h].sort((a,b)=>a-b)[h.length>>1]; } // médiane : ignore une mesure aberrante
+  if(soft && Math.abs(sec)<0.004){ d.a.playbackRate = d.pv; return sec; }
   if(soft && Math.abs(sec)<0.25){ d.a.playbackRate = d.pv*(1+Math.max(-.04,Math.min(.04,sec*0.6))); return sec; }
   d.eh = []; d.a.playbackRate = d.pv; if(Math.abs(sec)>0.012) d.a.currentTime += sec; return sec;
 }
@@ -3675,7 +3680,7 @@ function djQuant(k){ const d = djDeck(k); d.q = !d.q; const e = document.getElem
 setInterval(()=>{ // boucle calée sur un nombre entier de temps + re-verrouillage si dérive > 40 ms
   ['A','B'].forEach(k=>{ const d = DJ[k]; if(!d || d.yt || !d.loopLen || d.a.paused) return; if(d.a.currentTime >= d.off+d.loopLen) d.a.currentTime -= d.loopLen; });
 }, 30);
-setInterval(()=>{ ['A','B'].forEach(k=>{ const d = DJ[k], o = DJ[k==='A'?'B':'A']; if(!d || !d.lock || !o) return; if(k==='A' && o.lock) return; djTempoMatch(k); if(!o.a.paused) djPhase(k, !d.a.paused); }); }, 300);
+setInterval(()=>{ ['A','B'].forEach(k=>{ const d = DJ[k], o = DJ[k==='A'?'B':'A']; if(!d || !d.lock || !o) return; if(k==='A' && o.lock) return; djTempoMatch(k); if(!o.a.paused){ const both = !d.a.paused; djPhase(k, both && d.was); d.was = both; } else d.was = false; }); }, 300);
 function djSet(k, what, v){
   const d = djDeck(k); v = +v;
   if(what==='pv'){ d.pv = v; if(!djSyncing) d.lock = null; d.a.playbackRate = v; const l = document.getElementById('djPl'+k), b = document.getElementById('djB'+k); if(!djSyncing){ djSyncUI(); } if(l) l.textContent = ((v-1)*100).toFixed(1)+'%'; if(b && d.bpm) b.textContent = (d.bpm*v).toFixed(1)+' BPM'; }
