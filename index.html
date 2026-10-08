@@ -667,7 +667,7 @@ function renderPlaylists(){
   if(!isPro()) return head + `<div class="hpad" style="margin-top:40px;"><div class="card" style="text-align:center;"><div style="font-size:34px;">🎵🔒</div><h3 style="margin:10px 0 6px;">Playlists réservées aux membres Premium</h3><p style="color:var(--text-muted);font-size:12.5px;line-height:1.6;">Créez vos playlists et ajoutez-y vos morceaux préférés.</p><button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="open-paywall">🔓 Débloquer Premium</button></div></div>`;
   if(plOpen && plMap[plOpen]){
     const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div><span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
-    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
+    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div>${playSourceHTML()}<div class="hpad" style="display:flex;gap:8px;margin:8px 0 10px;"><button class="btn" data-action="pl-yt" style="flex:1;">🔗 Lien YouTube de la playlist</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
   }
   const names = Object.keys(plMap);
   return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><input id="plName" placeholder="Nom de la playlist" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"><button class="btn btn-primary" data-action="pl-create">Créer</button></div>`
@@ -2670,12 +2670,14 @@ function plQStart(name, shuffle){
   if(shuffle) items.sort(()=>Math.random()-.5);
   djAutoStop(true); plQ = {items, i:0, dir:1, err:0}; plQPlay();
 }
-function plQPlay(tries){
+async function plQPlay(tries){
   const q = plQ; if(!q) return; tries = tries||0; const n = q.items.length, f = q.items[((q.i%n)+n)%n], apple = getPlaySource()==='apple', yt = ytLookup(f.title, f.artist);
-  if(!apple && !yt){ if(tries>=n){ plQ = null; stopPlayback(); toast('Aucun titre avec lecteur intégré'); return; } q.i += q.dir; return plQPlay(tries+1); }
+  const skip = msg => { if(tries>=n){ plQ = null; stopPlayback(); toast(msg); return; } q.i += q.dir; plQPlay(tries+1); };
+  if(!apple && !yt) return skip('Aucun titre avec lecteur intégré');
   const id = 'plq:'+f.title+'|'+f.artist;
   realTracksCache[id] = {id, title:f.title, artist:f.artist, isRealCity:true, youtubeId:yt||null, coverUrl:f.cover||null};
-  togglePlay(id, apple ? 'apple' : 'youtube');
+  await togglePlay(id, apple ? 'apple' : 'youtube');
+  if(plQ===q && state.noPreview && state.noPreview.title===f.title) skip('Aucun extrait trouvé pour cette playlist'); // ni extrait Apple ni vidéo : titre suivant
 }
 function plQNext(d){ if(!plQ) return; plQ.dir = d||1; plQ.i += plQ.dir; plQPlay(); }
 const plqBtns = () => plQ ? '<button data-action="plq-prev" title="Précédent">⏮</button><button data-action="plq-next" title="Suivant">⏭</button>' : '';
@@ -3551,7 +3553,7 @@ function djHTML(){
       <div id="djT${k}" style="font-weight:800;font-size:11px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.t)||'— vide —'}</div>
       <div id="djA${k}" style="font-size:10px;color:var(--text-muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.ar)}</div>
       <input type="range" id="djS${k}" min="0" max="1000" value="0" oninput="djSeek('${k}',this.value)" style="width:100%;margin:4px 0;accent-color:${col};">
-      <div style="display:flex;gap:5px;"><button class="icon-btn" id="djP${k}" onclick="djPlay('${k}')" style="flex:1;">${playing?'⏸':'▶'}</button><button class="icon-btn" onclick="djCue('${k}')" style="flex:1;">CUE</button><button class="icon-btn" id="djSy${k}" onclick="djSync('${k}')" style="flex:1.6;font-weight:900;font-size:11px;background:${d.lock?col:'#2a2a36'};color:${d.lock?'#000':'#fff'};">${d.lock?'SYNC ON':'SYNC OFF'}</button></div>
+      <div style="display:flex;gap:5px;"><button class="icon-btn" id="djP${k}" onclick="djPlay('${k}')" style="flex:1;">${playing?'⏸':'▶'}</button><button class="icon-btn" onclick="djCue('${k}')" style="flex:1;">CUE</button><button class="icon-btn" id="djSy${k}" onclick="djSync('${k}')" style="flex:1.6;font-weight:900;font-size:11px;background:${d.lock?col:'#2a2a36'};color:${d.lock?'#000':'#fff'};">${d.lock?'SYNC ON':'SYNC OFF'}</button><button class="icon-btn" id="djQb${k}" onclick="djQuant('${k}')" style="flex:1.3;font-weight:900;font-size:10px;background:${d.q?'#22c55e':'#2a2a36'};color:${d.q?'#000':'#fff'};">${d.q?'QUANT ON':'QUANT OFF'}</button></div>
       <div style="display:flex;justify-content:space-around;margin:10px 0 6px;">${djKnob(k,0,-12,12,'BASS',d.eq[0])}${djKnob(k,1,-12,12,'MED',d.eq[1])}${djKnob(k,2,-12,12,'AIGU',d.eq[2])}</div>
       <div style="display:flex;justify-content:center;align-items:flex-end;gap:10px;"><div style="text-align:center;"><div style="display:flex;gap:2px;align-items:stretch;">${djFader('djPv'+k,DJR[0],DJR[1],0.002,d.pv,`djSet('${k}','pv',this.value)`,col)}<div id="djSc${k}" style="display:flex;flex-direction:column;justify-content:space-between;height:120px;font-size:8px;font-weight:800;color:var(--text-muted);text-align:left;min-width:24px;">${djScaleHTML(DJ[k])}</div></div><div id="djPl${k}" style="font-size:8.5px;color:var(--text-muted);font-weight:800;">${((d.pv-1)*100).toFixed(1)}%</div><div style="font-size:8.5px;color:var(--text-muted);font-weight:800;">TEMPO (BPM)</div></div><div style="text-align:center;">${djFader('djV'+k,0,1,0.01,d.vol,`djSet('${k}','vol',this.value)`,col)}<div style="font-size:8.5px;color:var(--text-muted);font-weight:800;margin-top:14px;">VOL</div></div></div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px;">${pads}</div></div>`; };
@@ -3562,7 +3564,7 @@ function djHTML(){
   <div id="djRes" class="hpad" style="max-height:210px;overflow:auto;">${djResHTML()}</div>
   <div class="hpad" style="display:flex;gap:8px;">${deck('A','#22d3ee')}${deck('B','#facc15')}</div>
   <div class="hpad" style="display:flex;gap:8px;margin-top:8px;">${['A','B'].map(k=>`<div style="flex:1;min-width:0;text-align:center;"><div id="djY${k}"></div><div id="djL${k}">${djLnk(DJ[k])}</div></div>`).join('')}</div>
-  <div class="hpad" style="margin:12px 0;text-align:center;"><div style="font-size:11px;font-weight:800;color:var(--text-muted);">A &nbsp;◀ CROSSFADER ▶&nbsp; B</div><input id="djXf" type="range" min="0" max="100" value="${djX}" oninput="djX=+this.value;djLevel()" style="width:100%;"><button class="icon-btn" id="djQb" onclick="djQuant()" style="margin-top:6px;font-weight:900;font-size:11px;${djQ?'background:#22c55e;color:#000;':'background:#2a2a36;color:#fff;'}">${djQ?'QUANTIZE ON':'QUANTIZE OFF'}</button></div>
+  <div class="hpad" style="margin:12px 0;text-align:center;"><div style="font-size:11px;font-weight:800;color:var(--text-muted);">A &nbsp;◀ CROSSFADER ▶&nbsp; B</div><input id="djXf" type="range" min="0" max="100" value="${djX}" oninput="djX=+this.value;djLevel()" style="width:100%;"></div>
   <div style="height:20px;"></div>`;
 }
 const djResHTML = () => djRes.length ? djRes.map((r,i)=>`<div class="alert-item" style="align-items:center;"><div class="aic"><img src="${esc((r.artworkUrl100||''))}" alt="" style="width:36px;height:36px;border-radius:8px;"></div><div style="min-width:0;flex:1;"><div class="at" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.trackName)}</div><div class="ad">${esc(r.artistName)}${djFull && !ytLookup(r.trackName, r.artistName) ? ' · <i>pas de version complète</i>' : ''}</div></div><button class="icon-btn" onclick="djLoad('A',${i})">→A</button><button class="icon-btn" onclick="djLoad('B',${i})">→B</button></div>`).join('') : '<div class="empty-msg">Choisissez ou glissez des fichiers audio, puis chargez-les sur la platine A ou B.</div>';
@@ -3621,7 +3623,7 @@ function djLoadR(k, r, quiet){
 function djPlay(k){
   const d = DJ[k]; if(!d || !d.a.src) { toast('Chargez d\'abord un titre'); return; }
   stopPlayback(); if(djCtx.state==='suspended') djCtx.resume();
-  if(d.a.paused){ const o = DJ[k==='A'?'B':'A']; if((djQ||d.lock) && o && !o.a.paused) djPhase(k); d.a.play().catch(()=>{}); } else d.a.pause();
+  if(d.a.paused){ const o = DJ[k==='A'?'B':'A']; if((d.q||d.lock) && o && !o.a.paused) djPhase(k); d.a.play().catch(()=>{}); } else d.a.pause();
   djSpin(k);
 }
 function djCue(k){ const d = DJ[k]; if(d && d.a.src){ d.a.currentTime = 0; } }
@@ -3667,9 +3669,8 @@ function djPhase(k, soft){ // cale les pulsations de la platine k sur celles de 
   if(soft && Math.abs(sec)<0.12){ d.a.playbackRate = d.pv*(1+Math.max(-.03,Math.min(.03,sec))); return sec; }
   d.a.playbackRate = d.pv; if(Math.abs(sec)>0.012) d.a.currentTime += sec; return sec;
 }
-let djQ = false;
-function djSnap(d, t){ if(!djQ || !d || !d.on || !d.bpm) return t; const P = 60/d.bpm, b = djBeat(d, t); return Math.max(0, b+Math.round((t-b)/P)*P); }
-function djQuant(){ djQ = !djQ; const e = document.getElementById('djQb'); if(e){ e.style.background = djQ?'#22c55e':'#2a2a36'; e.style.color = djQ?'#000':'#fff'; e.textContent = djQ?'QUANTIZE ON':'QUANTIZE OFF'; } toast(djQ?'Quantize : démarrages et repères calés sur les temps':'Quantize désactivé'); }
+function djSnap(d, t){ if(!d || !d.q || !d.on || !d.bpm) return t; const P = 60/d.bpm, b = djBeat(d, t); return Math.max(0, b+Math.round((t-b)/P)*P); }
+function djQuant(k){ const d = djDeck(k); d.q = !d.q; const e = document.getElementById('djQb'+k); if(e){ e.style.background = d.q?'#22c55e':'#2a2a36'; e.style.color = d.q?'#000':'#fff'; e.textContent = d.q?'QUANT ON':'QUANT OFF'; } toast('Quantize '+k+(d.q?' activé : démarrage et repères calés sur les temps':' désactivé')); }
 setInterval(()=>{ // boucle calée sur un nombre entier de temps + re-verrouillage si dérive > 40 ms
   ['A','B'].forEach(k=>{ const d = DJ[k]; if(!d || d.yt || !d.loopLen || d.a.paused) return; if(d.a.currentTime >= d.off+d.loopLen) d.a.currentTime -= d.loopLen; });
 }, 30);
@@ -4512,6 +4513,7 @@ document.addEventListener('click', async (e)=>{
   else if(a==='pl-open'){ plOpen=el.dataset.n; renderView(); }
   else if(a==='pl-back'){ plOpen=null; renderView(); }
   else if(a==='pl-mix'){ plQStart(plOpen, el.dataset.s==='1'); }
+  else if(a==='pl-yt'){ const ids = (plMap[plOpen]||[]).map(f=>ytLookup(f.title, f.artist)).filter(Boolean); if(!ids.length){ toast('Aucune vidéo YouTube connue pour cette playlist'); } else window.open('https://www.youtube.com/watch_videos?video_ids='+ids.join(','), '_blank', 'noopener'); }
   else if(a==='plq-next'){ plQNext(1); }
   else if(a==='plq-prev'){ plQNext(-1); }
   else if(a==='pl-del'){ delete plMap[plOpen]; plOpen=null; plSave(); renderView(); }
