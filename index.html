@@ -3616,7 +3616,7 @@ function djSync(k){ // bouton SYNC : active / désactive le verrouillage sur l'a
   if(d && d.lock){ d.lock = null; djSyncUI(); toast('Synchro désactivée'); return; }
   if(!d || !o || !d.bpm || !o.bpm){ toast('Chargez deux titres et attendez le BPM'); return; }
   if(!djTempoMatch(k)){ toast('Tempos trop éloignés pour se synchroniser'); return; }
-  d.lock = k==='A' ? 'B' : 'A'; o.lock = null; djSyncUI();
+  d.lock = k==='A' ? 'B' : 'A'; djSyncUI();
   const ph = !d.a.paused && !o.a.paused ? djPhase(k) : null;
   toast('Synchro activée sur '+(o.bpm*o.pv).toFixed(1)+' BPM'+(d.yt||o.yt ? ' (YouTube : tempo seulement, par pas de 5 %)' : (ph===null ? ' — lancez les deux platines pour caler les temps' : '')));
 }
