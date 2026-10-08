@@ -2835,7 +2835,7 @@ function renderView(){
   if(state.view==='home' && !featuredLoaded){ featuredLoaded = true; loadFeaturedPicks(); }
   document.querySelectorAll('.nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.view===state.view));
   const c = document.getElementById('view-container');
-  if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else if(state.scope==='country') loadHomeCountryList(); else loadHomeGenreChartList(); }
+  if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else if(state.scope==='country') loadHomeCountryList(); else { loadHomeGenreChartList(); loadWorldExtra(); } }
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
   else if(state.view==='playlists') c.innerHTML = renderPlaylists();
@@ -2959,11 +2959,24 @@ function renderHome(){
   <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
 ` : `
   <div class="track-list">
-    ${list.length===0 ? `<div class="empty-msg">Classement bientôt disponible pour ce genre.</div>` : withLockBanner(list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)), freeLimit)}
+    ${list.length===0 ? `<div class="empty-msg">Classement bientôt disponible pour ce genre.</div>` : withLockBanner(list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)), freeLimit)}<div id="homeWorldExtra"></div>
   </div>
 `}
   <div style="height:8px;"></div>
   `;
+}
+// Monde / TOUT : le catalogue fixe n'a que ~66 titres ; on complète jusqu'à 100 avec le haut des classements par genre (Beatport), sans doublon
+async function loadWorldExtra(){
+  const host = document.getElementById('homeWorldExtra'); if(!host) return;
+  const base = scopedList().slice(0,100), need = 100-base.length; if(need<=0) return;
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/genre_chart_entries?select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=1000`, { headers: SUPABASE_HEADERS });
+    const rows = await res.json(); if(!Array.isArray(rows)) return;
+    const key = (t,a)=>coreTitle(t)+'|'+normText(a), seen = new Set(base.map(t=>key(t.title,t.artist)));
+    const extra = rows.filter(r=>!isPlaceholderTitle(r.title) && !seen.has(key(r.title,r.artist_name)) && seen.add(key(r.title,r.artist_name))).slice(0,need);
+    const h = document.getElementById('homeWorldExtra'); if(!h) return;
+    h.innerHTML = extra.map((r,j)=>renderRealTrackRow({rank:base.length+j+1, previous_rank:r.previous_rank, tracks:{title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null}}, base.length+j, !isPro())).join('');
+  }catch(e){}
 }
 async function loadHomeCityList(){
   const appCityId = cityViewId();
