@@ -667,7 +667,7 @@ function renderPlaylists(){
   if(!isPro()) return head + `<div class="hpad" style="margin-top:40px;"><div class="card" style="text-align:center;"><div style="font-size:34px;">🎵🔒</div><h3 style="margin:10px 0 6px;">Playlists réservées aux membres Premium</h3><p style="color:var(--text-muted);font-size:12.5px;line-height:1.6;">Créez vos playlists et ajoutez-y vos morceaux préférés.</p><button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="open-paywall">🔓 Débloquer Premium</button></div></div>`;
   if(plOpen && plMap[plOpen]){
     const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div><span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
-    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
+    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
   }
   const names = Object.keys(plMap);
   return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><input id="plName" placeholder="Nom de la playlist" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"><button class="btn btn-primary" data-action="pl-create">Créer</button></div>`
@@ -2810,7 +2810,7 @@ function renderView(){
   else if(state.view==='playlists') c.innerHTML = renderPlaylists();
   else if(state.view==='radar'){ c.innerHTML = renderRadar(); loadRadar(); }
   else if(state.view==='discover'){ c.innerHTML = '<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Je découvre</div></div></div><div id="radarBody"></div><div style="height:10px;"></div>'; renderShazam(); }
-  else if(state.view==='dj') c.innerHTML = djHTML();
+  else if(state.view==='dj'){ c.innerHTML = djHTML(); ['A','B'].forEach(k=>DJ[k] && DJ[k].yt && DJ[k].yt.mount()); }
   else if(state.view==='profile') c.innerHTML = renderProfile();
   c.scrollTop = 0;
 }
@@ -3528,19 +3528,22 @@ function djHTML(){
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px;">${pads}</div></div>`; };
   return `<style>.djsp{animation:djspin 2.2s linear infinite}@keyframes djspin{to{transform:rotate(360deg)}}.djk{width:36px;height:36px;border-radius:50%;margin:0 auto;background:radial-gradient(#3a3a48,#14141c);border:2px solid #555;touch-action:none;position:relative}.djk i{position:absolute;left:50%;top:2px;width:3px;height:10px;margin-left:-1.5px;background:#fff;border-radius:2px}</style>
   <div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>🎛️ MIX</div></div></div>
-  <div class="hpad" style="margin:8px 0;"><input id="djInp" type="search" placeholder="Chercher un titre à charger…" oninput="djSearch()" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:16px;"></div>
+  ${djAuto ? `<div class="hpad" style="margin-top:8px;"><button class="btn btn-block" onclick="djAutoStop(true);renderView()">⏹ Arrêter le mix automatique</button></div>` : ''}
+  <div class="hpad" style="display:flex;gap:6px;margin-top:8px;">${[[false,'Extraits 30 s + EQ'],[true,'Morceau entier (YouTube)']].map(([v,l])=>`<button class="icon-btn" onclick="djFull=${v};renderView()" style="flex:1;${djFull===v?'background:var(--accent,#6366f1);color:#fff;':'opacity:.55;'}">${l}</button>`).join('')}</div>
+  <div class="hpad" style="margin:8px 0;"><input id="djInp" type="search" placeholder="Chercher un titre à charger…" oninput="djSearch()" onsearch="djSearch()" style="width:100%;box-sizing:border-box;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:16px;"></div>
   <div class="hpad" style="display:flex;gap:8px;">${deck('A','#22d3ee')}${deck('B','#facc15')}</div>
-  <div class="hpad" style="margin:12px 0;text-align:center;"><div style="font-size:11px;font-weight:800;color:var(--text-muted);">A &nbsp;◀ CROSSFADER ▶&nbsp; B</div><input type="range" min="0" max="100" value="${djX}" oninput="djX=+this.value;djLevel()" style="width:100%;"></div>
+  <div class="hpad" style="display:flex;gap:8px;margin-top:8px;">${['A','B'].map(k=>`<div style="flex:1;min-width:0;text-align:center;"><div id="djY${k}"></div><div id="djL${k}">${djLnk(DJ[k])}</div></div>`).join('')}</div>
+  <div class="hpad" style="margin:12px 0;text-align:center;"><div style="font-size:11px;font-weight:800;color:var(--text-muted);">A &nbsp;◀ CROSSFADER ▶&nbsp; B</div><input id="djXf" type="range" min="0" max="100" value="${djX}" oninput="djX=+this.value;djLevel()" style="width:100%;"></div>
   <div id="djRes">${djResHTML()}</div><div style="height:20px;"></div>`;
 }
-const djResHTML = () => djRes.length ? djRes.map((r,i)=>`<div class="alert-item" style="align-items:center;"><div class="aic"><img src="${esc((r.artworkUrl100||''))}" alt="" style="width:36px;height:36px;border-radius:8px;"></div><div style="min-width:0;flex:1;"><div class="at" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.trackName)}</div><div class="ad">${esc(r.artistName)}</div></div><button class="icon-btn" onclick="djLoad('A',${i})">→A</button><button class="icon-btn" onclick="djLoad('B',${i})">→B</button></div>`).join('') : '<div class="empty-msg">Cherchez un titre puis chargez-le sur la platine A ou B (extraits de 30 s, en boucle).</div>';
+const djResHTML = () => djRes.length ? djRes.map((r,i)=>`<div class="alert-item" style="align-items:center;"><div class="aic"><img src="${esc((r.artworkUrl100||''))}" alt="" style="width:36px;height:36px;border-radius:8px;"></div><div style="min-width:0;flex:1;"><div class="at" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.trackName)}</div><div class="ad">${esc(r.artistName)}${djFull && !ytLookup(r.trackName, r.artistName) ? ' · <i>pas de version complète</i>' : ''}</div></div><button class="icon-btn" onclick="djLoad('A',${i})">→A</button><button class="icon-btn" onclick="djLoad('B',${i})">→B</button></div>`).join('') : '<div class="empty-msg">Cherchez un titre puis chargez-le sur la platine A ou B (extraits de 30 s, en boucle).</div>';
 function djSearch(){
   clearTimeout(djTimer);
   djTimer = setTimeout(async ()=>{
     const q = document.getElementById('djInp').value.trim(), host = document.getElementById('djRes'); if(q.length<2||!host) return;
     host.innerHTML = '<div class="empty-msg">Recherche…</div>';
-    const r = await itunesSearchOnce(q, 25), h2 = document.getElementById('djRes'); if(!h2) return;
-    djRes = r.ok ? r.results.filter(x=>x.previewUrl) : []; h2.innerHTML = r.ok ? djResHTML() : '<div class="empty-msg">Recherche indisponible, réessayez dans une minute.</div>';
+    let r = await itunesSearchOnce(q, 25); for(let n=0; !r.ok && n<2; n++){ await new Promise(o=>setTimeout(o,1500)); r = await itunesSearchOnce(q, 25); } const h2 = document.getElementById('djRes'); if(!h2) return;
+    djRes = r.ok ? r.results.filter(x=>x.previewUrl) : []; h2.innerHTML = r.ok ? djResHTML() : '<div class="empty-msg" onclick="djSearch()">Recherche indisponible (réseau ou limite Apple). Touchez ici pour réessayer.</div>';
   }, 450);
 }
 // BPM estimé sur l'extrait : enveloppe d'énergie à 200 Hz puis autocorrélation (80–180 BPM). Précision ~±1 BPM.
@@ -3555,16 +3558,25 @@ async function djBpm(url){
   const a = sc(bl-1), b = sc(bl), c = sc(bl+1), off = (a-c)/(2*(a-2*b+c)||1); // interpolation parabolique
   return 12000/(bl+(isFinite(off)?Math.max(-.5,Math.min(.5,off)):0));
 }
-function djLoad(k, i){
-  const r = djRes[i]; if(!r) return; stopPlayback();
+function djLoad(k, i){ djLoadR(k, djRes[i]); }
+function djLnk(d){ return d && d.yt ? `<a href="https://open.spotify.com/search/${encodeURIComponent(d.t+' '+d.ar)}" target="_blank" rel="noopener" style="font-size:10px;font-weight:800;color:#1db954;text-decoration:none;">🟢 Ouvrir dans Spotify</a>` : ''; }
+function djLoadR(k, r, quiet){
+  if(!r) return false;
+  const yid = djFull ? ytLookup(r.trackName, r.artistName) : null;
+  if(djFull && !yid){ if(!quiet) toast('Pas de version complète pour ce titre'); return false; }
+  if(!yid && !r.previewUrl) return false;
+  stopPlayback();
   const d = djDeck(k); if(!d.a.paused) d.a.pause();
+  if(d.yt){ d.yt.destroy(); d.yt = null; d.a = d.ae; d.g = d.g0; }
+  if(yid){ d.ae = d.a; d.g0 = d.g; d.g = null; d.yt = d.a = new YTA(k, yid); }
   d.t = r.trackName; d.ar = r.artistName; d.art = (r.artworkUrl100||'').replace('100x100','200x200'); d.bpm = 0; d.cues = {};
-  d.a.src = r.previewUrl; d.a.playbackRate = d.pv; djLevel();
+  if(!yid) d.a.src = r.previewUrl;
+  d.a.playbackRate = d.pv; djLevel();
   const set = (id,f)=>{ const e = document.getElementById(id+k); if(e) f(e); };
-  set('djT',e=>e.textContent = d.t); set('djA',e=>e.textContent = d.ar); set('djI',e=>e.style.backgroundImage = `url(${d.art})`); set('djB',e=>e.textContent = '… BPM'); djSpin(k);
-  for(let p=0;p<6;p++) set('djPd',e=>{}); 
-  djBpm(r.previewUrl).then(v=>{ if(d.t!==r.trackName) return; d.bpm = v; const e = document.getElementById('djB'+k); if(e) e.textContent = v ? Math.round(v*d.pv)+' BPM' : '— BPM'; }).catch(()=>{ const e = document.getElementById('djB'+k); if(e) e.textContent = '— BPM'; });
-  toast('Chargé sur la platine '+k);
+  set('djT',e=>e.textContent = d.t); set('djA',e=>e.textContent = d.ar); set('djI',e=>e.style.backgroundImage = d.art ? `url(${d.art})` : 'none'); set('djB',e=>e.textContent = r.previewUrl ? '… BPM' : '— BPM'); set('djL',e=>e.innerHTML = djLnk(d)); djSpin(k);
+  if(r.previewUrl) djBpm(r.previewUrl).then(v=>{ if(d.t!==r.trackName) return; d.bpm = v; const e = document.getElementById('djB'+k); if(e) e.textContent = v ? Math.round(v*d.pv)+' BPM' : '— BPM'; }).catch(()=>{ const e = document.getElementById('djB'+k); if(e) e.textContent = '— BPM'; });
+  if(!quiet) toast('Chargé sur la platine '+k+(yid?' (morceau entier)':''));
+  return true;
 }
 function djPlay(k){
   const d = DJ[k]; if(!d || !d.a.src) { toast('Chargez d\'abord un titre'); return; }
@@ -3590,6 +3602,52 @@ function djSet(k, what, v){
   const d = djDeck(k); v = +v;
   if(what==='pv'){ d.pv = v; d.a.playbackRate = v; const l = document.getElementById('djPl'+k), b = document.getElementById('djB'+k); if(l) l.textContent = ((v-1)*100).toFixed(1)+'%'; if(b && d.bpm) b.textContent = Math.round(d.bpm*v)+' BPM'; }
   else if(what==='vol'){ d.vol = v; djLevel(); } else { d.eq[what] = v; if(d.f) d.f[what].gain.value = v; }
+}
+/* ---- Mode « morceau entier » : lecteur YouTube derrière la même interface que <audio> (pas d'EQ : l'audio YouTube est inaccessible à WebAudio) ---- */
+let djFull = false, djAuto = null, ytApiP = null;
+const ytApi = () => ytApiP = ytApiP || new Promise(ok=>{ if(window.YT && YT.Player) return ok(); const p = window.onYouTubeIframeAPIReady; window.onYouTubeIframeAPIReady = ()=>{ p && p(); ok(); }; const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); });
+class YTA{
+  constructor(k, id){ this.k = k; this.src = id; this.paused = true; this.loop = false; this._r = 1; this._v = 1; this._t = 0; this.mount(); }
+  mount(){
+    const h = document.getElementById('djY'+this.k); if(!h) return; clearInterval(this.iv); this.ok = false; h.innerHTML = '<div></div>';
+    ytApi().then(()=>{
+      this.p = new YT.Player(h.firstChild, {width:'100%', height:'110', videoId:this.src, playerVars:{playsinline:1, rel:0, start:Math.floor(this._t)}, events:{
+        onReady:()=>{ this.ok = true; this.p.setPlaybackRate(this._r); this.p.setVolume(this._v*100); if(this._go) this.p.playVideo(); },
+        onStateChange:e=>{ this.paused = e.data !== 1; djSpin(this.k); } }});
+      this.iv = setInterval(()=>{ if(!this.ok) return; this._t = this.currentTime; const s = document.getElementById('djS'+this.k), d = this.duration; if(s && d && !this.paused) s.value = this._t/d*1000; }, 500);
+    });
+  }
+  get currentTime(){ return this.ok ? this.p.getCurrentTime() : this._t; }
+  set currentTime(v){ this._t = v; if(this.ok) this.p.seekTo(v, true); }
+  get duration(){ return this.ok ? this.p.getDuration() : 0; }
+  set playbackRate(v){ this._r = v; if(this.ok) this.p.setPlaybackRate(v); }
+  set volume(v){ this._v = v; if(this.ok) this.p.setVolume(v*100); }
+  play(){ this._go = true; this.paused = false; if(this.ok) this.p.playVideo(); return Promise.resolve(); }
+  pause(){ this._go = false; this.paused = true; if(this.ok) this.p.pauseVideo(); }
+  destroy(){ clearInterval(this.iv); this.ok = false; try{ this.p.destroy(); }catch(e){} }
+}
+// Mix automatique d'une playlist : titres entiers, enchaînés par un fondu de 12 s (platines A/B en alternance)
+function djAutoStart(name, shuffle){
+  let q = (plMap[name]||[]).filter(f=>ytLookup(f.title, f.artist)).slice();
+  if(q.length<2){ toast('Il faut au moins 2 titres avec version complète'); return; }
+  if(shuffle) q.sort(()=>Math.random()-.5);
+  djAutoStop(true); stopPlayback(); djFull = true; djX = 0; state.view = 'dj'; renderView();
+  const a = djAuto = {q, i:0, cur:'A', fading:false};
+  a.ld = k => { const f = q[a.i++ % q.length]; djLoadR(k, {trackName:f.title, artistName:f.artist}, true); };
+  a.ld('A'); a.ld('B'); djPlay('A'); a.T = setInterval(djAutoTick, 1000);
+}
+function djAutoTick(){
+  const a = djAuto; if(!a || a.fading) return; const d = DJ[a.cur]; if(!d || !d.a.duration || d.a.duration-d.a.currentTime > 15) return;
+  a.fading = true; const nx = a.cur==='A' ? 'B' : 'A', n = DJ[nx]; n.a.currentTime = 0; n.a.play(); djSpin(nx);
+  const from = djX, to = nx==='B' ? 100 : 0, t0 = Date.now();
+  a.iv = setInterval(()=>{
+    const p = Math.min(1, (Date.now()-t0)/12000); djX = from+(to-from)*p; const s = document.getElementById('djXf'); if(s) s.value = djX; djLevel();
+    if(p>=1){ clearInterval(a.iv); if(djAuto!==a) return; DJ[a.cur].a.pause(); djSpin(a.cur); const old = a.cur; a.cur = nx; a.fading = false; a.ld(old); }
+  }, 250);
+}
+function djAutoStop(pause){
+  if(!djAuto) return; clearInterval(djAuto.T); clearInterval(djAuto.iv); djAuto = null;
+  if(pause) ['A','B'].forEach(k=>{ const d = DJ[k]; if(d && d.a.src){ d.a.pause(); djSpin(k); } });
 }
 async function loadArtistStats(){
   const name = state.radarArtist;
@@ -4377,6 +4435,7 @@ document.addEventListener('click', async (e)=>{
   else if(a==='pl-create'){ const n=(document.getElementById('plName').value||'').trim(); if(n){ plMap[n]=plMap[n]||[]; plSave(); renderView(); } }
   else if(a==='pl-open'){ plOpen=el.dataset.n; renderView(); }
   else if(a==='pl-back'){ plOpen=null; renderView(); }
+  else if(a==='pl-mix'){ djAutoStart(plOpen, el.dataset.s==='1'); }
   else if(a==='pl-del'){ delete plMap[plOpen]; plOpen=null; plSave(); renderView(); }
   else if(a==='pl-rm'){ plMap[plOpen].splice(+el.dataset.i,1); plSave(); renderView(); }
   else if(a==='add-pl'){ if(!isPro()) openPaywall(); else openAddPl(el.dataset.id); }
