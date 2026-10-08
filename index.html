@@ -519,7 +519,7 @@ async function fetchRealCityChart(appCityId, platform, period){
     if(!latestRows || !latestRows.length){ realChartCache[key] = []; return []; }
     const latestDate = latestRows[0].captured_at;
     const entriesRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${latestDate}&select=rank,previous_rank,tracks(title,artist_name,cover_url,youtube_id)&order=rank.asc&limit=100`,
+      `${SUPABASE_URL}/rest/v1/chart_entries?city_id=eq.${dbCityId}&platform=eq.${platform}&captured_at=eq.${latestDate}&select=rank,previous_rank,tracks(title,artist_name,cover_url,youtube_id)&order=rank.asc&limit=200`,
       { headers: SUPABASE_HEADERS }
     );
     let entries = await entriesRes.json();
@@ -733,9 +733,16 @@ function realChartPlatformTabsHTML(action, selected){
 function lockBannerHTML(){
   return `<div class="hpad" style="margin:10px 0;"><button class="btn btn-primary btn-block" data-action="open-paywall">${tr('home.unlockTop100')}</button></div>`;
 }
+const PRO_LIMIT = 100, PROPLUS_PRICE = '9,99 €'; // ponytail: prix Premium Pro provisoire, à fixer avant la publication
+const isProPlus = () => !!(state.user && state.user.isProPlus);
+const proBannerHTML = () => `<div class="hpad" style="margin:10px 0;"><button class="btn btn-block" data-action="open-paywall" style="background:linear-gradient(90deg,#f59e0b,#ef4444);color:#000;font-weight:900;">👑 Premium Pro : débloquer du 100e au 200e</button></div>`;
+// Paliers : gratuit = freeLimit premiers titres ; Premium = jusqu'au 100e ; Premium Pro = du 100e au 200e (flou + bannière au-delà)
 function withLockBanner(rows, freeLimit){
-  if(isPro() || freeLimit==null || rows.length<=freeLimit) return rows.join('');
-  return rows.slice(0,freeLimit).join('') + lockBannerHTML() + rows.slice(freeLimit).join('');
+  const cut = !isProPlus() && rows.length>PRO_LIMIT;
+  if(cut) rows = rows.map((r,i)=>i>=PRO_LIMIT ? `<div class="lock-row">${r}</div>` : r);
+  const cuts = []; if(!isPro() && freeLimit!=null && rows.length>freeLimit) cuts.push([freeLimit, lockBannerHTML()]); if(cut) cuts.push([PRO_LIMIT, proBannerHTML()]);
+  let out = '', prev = 0; cuts.forEach(([i,b])=>{ out += rows.slice(prev,i).join('')+b; prev = i; });
+  return out+rows.slice(prev).join('');
 }
 function realChartListHTML(entries, opts){
   opts = opts || {};
@@ -1295,7 +1302,7 @@ const I18N = {
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Genres`,
     'home.trendingNow': `🔥 Trending Now`,
-    'home.topGlobal': `GLOBAL TOP 100/500`,
+    'home.topGlobal': `GLOBAL TOP 200`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Débloquer le Top 100 complet — Premium`,
@@ -1449,7 +1456,7 @@ const I18N = {
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Genres`,
     'home.trendingNow': `🔥 Trending Now`,
-    'home.topGlobal': `GLOBAL TOP 100/500`,
+    'home.topGlobal': `GLOBAL TOP 200`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Unlock the full Top 100 — Premium`,
@@ -1603,7 +1610,7 @@ const I18N = {
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Géneros`,
     'home.trendingNow': `🔥 Tendencias`,
-    'home.topGlobal': `TOP 100/500 GLOBAL`,
+    'home.topGlobal': `TOP 200 GLOBAL`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Desbloquear el Top 100 completo — Premium`,
@@ -1757,7 +1764,7 @@ const I18N = {
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Genres`,
     'home.trendingNow': `🔥 Im Trend`,
-    'home.topGlobal': `GLOBALE TOP 100/500`,
+    'home.topGlobal': `GLOBALE TOP 200`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Komplette Top 100 freischalten — Premium`,
@@ -2940,7 +2947,7 @@ function renderHome(){
       </div>`).join('')}
   </div>
 
-  <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' 100/500 '+(state.countryCity?cityById(state.countryCity).name:cname(state.selectedCountry)).toUpperCase():''}</h2>
+  <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' 200 '+(state.countryCity?cityById(state.countryCity).name:cname(state.selectedCountry)).toUpperCase():''}</h2>
     ${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}
   </div>
   ${cityViewId() ? `
@@ -2959,7 +2966,7 @@ function renderHome(){
   <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">Powered by Soundcharts</div>
 ` : `
   <div class="track-list">
-    ${list.length===0 ? `<div class="empty-msg">Classement bientôt disponible pour ce genre.</div>` : withLockBanner(list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)), freeLimit)}
+    ${list.length===0 ? `<div class="empty-msg">Classement bientôt disponible pour ce genre.</div>` : withLockBanner(list.slice(0,200).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=freeLimit)), freeLimit)}
   </div>
 `}
   <div style="height:8px;"></div>
@@ -2987,7 +2994,7 @@ async function loadHomeCityList(){
     // Pas encore de données électro pour ce pays : sélection électro de démonstration, classée par affinité avec la ville.
     const demo = TRACKS.filter(trackMatchesGenreFilter).slice().sort((a,b)=>(b.cityAffinity[appCityId]||0)-(a.cityAffinity[appCityId]||0));
     host.innerHTML = `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">Classement électro réel de cette ville bientôt disponible : sélection électro de démonstration.</div>`
-      + withLockBanner(demo.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)), 20);
+      + withLockBanner(demo.slice(0,200).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)), 20);
     return;
   }
   host.innerHTML = (note ? `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">${note}</div>` : '')
@@ -3002,7 +3009,7 @@ async function fetchCountryElectronic(cc){
   if(!cc) return [];
   if(countryElectroCache[cc]) return countryElectroCache[cc];
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/country_electronic_entries?country_code=eq.${cc}&select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=100`, { headers: SUPABASE_HEADERS });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/country_electronic_entries?country_code=eq.${cc}&select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=200`, { headers: SUPABASE_HEADERS });
     const rows = await res.json();
     const entries = (Array.isArray(rows)?rows:[]).map(r=>({ rank:r.rank, previous_rank:r.previous_rank, tracks:{ title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null } }));
     if(entries.length) countryElectroCache[cc] = entries;
@@ -3049,7 +3056,7 @@ async function loadHomeCountryList(){
   if(entries.length){ host.innerHTML = realChartListHTML(entries, { freeLimit: isPro() ? null : FREE_LIMIT_TRACKS }); return; }
   const list = scopedList();
   host.innerHTML = `<div style="font-size:10.5px;color:var(--text-muted);padding:0 18px 8px;line-height:1.4;">Classement électro de ce pays bientôt disponible : sélection électro de démonstration.</div>`
-    + withLockBanner(list.slice(0,100).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)), 20);
+    + withLockBanner(list.slice(0,200).map((t,i)=>renderTrackRow(t, i, !isPro() && i>=20)), 20);
 }
 
 // Real per-genre Top 100 (Monde/Pays), synced daily from Beatport's own
@@ -3064,7 +3071,7 @@ async function fetchGenreChart(genreKey){
   if(genreChartCache[genreKey]) return genreChartCache[genreKey];
   try{
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/genre_chart_entries?genre_key=eq.${genreKey}&select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=100`,
+      `${SUPABASE_URL}/rest/v1/genre_chart_entries?genre_key=eq.${genreKey}&select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=200`,
       { headers: SUPABASE_HEADERS }
     );
     const rows = await res.json();
@@ -4249,6 +4256,7 @@ function openPaywall(){
           <div style="display:flex;gap:10px;align-items:center;padding:7px 0;font-size:13px;"><span style="color:var(--good-text);">✓</span>${tr(k)}</div>`).join('')}
       </div>
       <button class="btn btn-primary btn-block" data-action="activate-pro">${tr('paywall.activate')}</button>
+      <div style="margin:16px 0 4px;padding:12px;border:1px solid #f59e0b;border-radius:14px;text-align:center;"><div style="font-weight:900;">👑 Premium Pro — ${PROPLUS_PRICE}<span style="font-size:11px;color:var(--text-muted);font-weight:600;">${tr('paywall.perMonth')}</span></div><div style="font-size:12px;color:var(--text-muted);margin:4px 0 8px;">Tout Premium + classements complets du 100e au 200e (monde, genres et pays)</div><button class="btn btn-block" data-action="activate-proplus" style="background:linear-gradient(90deg,#f59e0b,#ef4444);color:#000;font-weight:900;">Activer Premium Pro (démo)</button></div>
       <button class="btn btn-ghost btn-block" style="margin-top:9px;" data-action="close-paywall">${tr('paywall.later')}</button>
       <p style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:12px;">${tr('paywall.labelOffer')}</p>
     </div>`;
@@ -4608,6 +4616,7 @@ document.addEventListener('click', async (e)=>{
     renderView();
     if(!document.getElementById('trackOverlay').classList.contains('hidden')) renderTrackOverlay();
   }
+  else if(a==='activate-proplus'){ if(state.user){ state.user.isPro = true; state.user.isProPlus = true; } persistState(); closePaywall(); toast('Premium Pro activé'); renderView(); }
   else if(a==='toggle-pf-genre'){
     el.classList.toggle('on');
     if(el.classList.contains('on')){ el.style.background = el.style.color+'22'; el.style.borderColor = el.style.color; }
