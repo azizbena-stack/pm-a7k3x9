@@ -654,13 +654,12 @@ function renderSearch(){
   const host = document.getElementById('searchRes'); if(!host) return;
   const q = document.getElementById('searchInp').value.trim();
   if(!q){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre.</div>'; return; }
-  const e = encodeURIComponent(q);
+  const e = encodeURIComponent(q), name = q.replace(/\S+/g, w=>w[0].toUpperCase()+w.slice(1)); // « black accord » → « Black Accord »
   const links = [['Spotify','#1DB954',`https://open.spotify.com/search/${e}`],['Apple Music','#FA243C',`https://music.apple.com/search?term=${e}`],
     ['YouTube','#FF0000',`https://www.youtube.com/results?search_query=${e}`],['Beatport','#01FF95',`https://www.beatport.com/search?q=${e}`],
     ['Instagram','#E1306C',`https://www.instagram.com/explore/search/keyword/?q=${e}`],['TikTok','#25F4EE',`https://www.tiktok.com/search/user?q=${e}`]];
   host.innerHTML = `<div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
-    <div style="font-size:12px;color:var(--text-muted);">Ouvrir « ${esc(q)} » dans :</div>
-    ${links.map(([n,c,u])=>`<a href="${u}" target="_blank" rel="noopener" class="card" style="display:flex;align-items:center;gap:12px;padding:14px 16px;font-weight:700;"><span style="width:10px;height:10px;border-radius:50%;background:${c};box-shadow:0 0 10px ${c};"></span>${n}<span style="margin-left:auto;color:var(--text-muted);">↗</span></a>`).join('')}
+    ${links.map(([n,c,u])=>`<a href="${u}" target="_blank" rel="noopener" class="card" style="display:flex;align-items:center;gap:12px;padding:14px 16px;font-weight:700;"><span style="width:10px;height:10px;border-radius:50%;background:${c};box-shadow:0 0 10px ${c};flex:none;"></span><span style="min-width:0;display:flex;flex-direction:column;gap:2px;"><span>${n}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-weight:600;font-size:12px;">${esc(name)}</span></span><span style="margin-left:auto;color:var(--text-muted);">↗</span></a>`).join('')}
   </div>`;
 }
 function openSearch(){
