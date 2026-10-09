@@ -4526,7 +4526,6 @@ function renderAuthScreen(){
     <div style="height:10px"></div>
     <button class="btn btn-ghost btn-block" data-action="toggle-auth-mode" ${authBusy?'disabled':''}>${isSignup ? tr('auth.haveAccount') : tr('auth.noAccount')}</button>
     <div style="height:10px"></div>
-    <button class="btn btn-ghost btn-block" data-action="guest" ${authBusy?'disabled':''}>${tr('auth.guest')}</button>
     <p style="text-align:center; color:var(--text-muted); font-size:10.5px; margin-top:18px; line-height:1.6;">
       ${tr('auth.disclaimer')}
     </p>
@@ -4591,10 +4590,6 @@ document.addEventListener('click', async (e)=>{
       authError = mapAuthError(err);
       renderAuthScreen();
     }
-  }
-  else if(a==='guest'){
-    state.user = {name:'Invité', email:'', isPro:false, artistName:'', genres:[]};
-    enterApp();
   }
   else if(a==='logout'){
     authSignOut();
