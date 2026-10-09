@@ -2838,6 +2838,12 @@ function setQuickGenre(key){
   else if(genreById(key)){ state.genreFilters.add(key); }
   renderView();
 }
+function trendGenreLabel(){
+  if(state.scope==='country') return cname(state.selectedCountry);
+  const s = [...state.genreFilters];
+  if(!s.length) return tr('home.chipAll');
+  return [...new Set(s.map(k=>CHART_GENRE_LABEL[k] || k.replace(/-/g,' ')))].join(' · ');
+}
 function quickGenreActive(key){
   const s = state.genreFilters;
   if(key==='all') return s.size===0;
@@ -2962,6 +2968,7 @@ function renderHome(){
   <div class="section-title"><h2>${tr('home.trendingNow')}</h2>
     <span class="link" data-action="set-trending-period" data-p="${state.trendingPeriod==='24h'?'7d':state.trendingPeriod==='7d'?'30d':'24h'}">${state.trendingPeriod.toUpperCase()} ⟳</span>
   </div>
+  <div style="margin:-6px 18px 10px;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--brand-a);text-shadow:0 0 10px rgba(255,43,214,.45);">${esc(trendGenreLabel())}</div>
   <div class="hscroll">
     ${trending.map((t,i)=>`
       ${!isPro()&&i===10?'<div class="next-card" style="flex:0 0 168px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;" data-action="open-paywall">🔓 Débloquer Premium</div>':''}<div class="next-card ${!isPro()&&i>=10?'lock-row':''}" style="flex:0 0 168px;" ${!isPro()&&i>=10?'':`data-action="open-track" data-id="${t.id}"`}>
