@@ -656,7 +656,8 @@ function renderSearch(){
   if(!q){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre.</div>'; return; }
   const e = encodeURIComponent(q);
   const links = [['Spotify','#1DB954',`https://open.spotify.com/search/${e}`],['Apple Music','#FA243C',`https://music.apple.com/search?term=${e}`],
-    ['YouTube','#FF0000',`https://www.youtube.com/results?search_query=${e}`],['Beatport','#01FF95',`https://www.beatport.com/search?q=${e}`]];
+    ['YouTube','#FF0000',`https://www.youtube.com/results?search_query=${e}`],['Beatport','#01FF95',`https://www.beatport.com/search?q=${e}`],
+    ['Instagram','#E1306C',`https://www.instagram.com/explore/search/keyword/?q=${e}`],['TikTok','#25F4EE',`https://www.tiktok.com/search/user?q=${e}`]];
   host.innerHTML = `<div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
     <div style="font-size:12px;color:var(--text-muted);">Ouvrir « ${esc(q)} » dans :</div>
     ${links.map(([n,c,u])=>`<a href="${u}" target="_blank" rel="noopener" class="card" style="display:flex;align-items:center;gap:12px;padding:14px 16px;font-weight:700;"><span style="width:10px;height:10px;border-radius:50%;background:${c};box-shadow:0 0 10px ${c};"></span>${n}<span style="margin-left:auto;color:var(--text-muted);">↗</span></a>`).join('')}
