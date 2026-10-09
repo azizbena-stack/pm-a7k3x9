@@ -649,46 +649,23 @@ function toggleHeart(id){
   lsSave();
   document.querySelectorAll('.heart').forEach(el=>{ if(el.dataset.id===id){ el.classList.toggle('on',!!favMap[k]); el.textContent = favMap[k]?'♥':'♡'; } });
 }
-let searchIdx = null, searchFav = false;
-async function loadSearchIndex(){
-  if(searchIdx) return searchIdx;
-  const seen = new Map();
-  for(const table of ['genre_chart_entries','country_electronic_entries']){
-    for(let off=0; off<8000; off+=1000){
-      try{
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=title,artist_name,cover_url&order=id.asc&limit=1000&offset=${off}`, { headers: SUPABASE_HEADERS });
-        const rows = await res.json();
-        if(!Array.isArray(rows) || !rows.length) break;
-        rows.forEach(r=>{ if(isPlaceholderTitle(r.title)) return; const k = coreTitle(r.title)+'|'+normText(r.artist_name); if(!seen.has(k)) seen.set(k,{title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null, q:normText(r.title+' '+r.artist_name)}); });
-        if(rows.length<1000) break;
-      }catch(e){ break; }
-    }
-  }
-  return searchIdx = [...seen.values()];
-}
-async function renderSearch(){
+// Recherche : seulement des liens vers la recherche Spotify / Apple Music / YouTube / Beatport (aucune donnée affichée).
+function renderSearch(){
   const host = document.getElementById('searchRes'); if(!host) return;
-  const words = normText(document.getElementById('searchInp').value).split(' ').filter(Boolean);
-  let list;
-  if(searchFav) list = Object.values(favMap).map(f=>({title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}));
-  else if(!words.length){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre.</div>'; return; }
-  else { host.innerHTML = '<div class="empty-msg">Recherche…</div>'; const idx = await loadSearchIndex(); list = idx.filter(r=>words.every(w=>r.q.includes(w))).slice(0,50);
-    // un genre tapé (house, techno, indie dance…) : on ajoute le haut de son classement
-    const rows = await loadRadarRows(), gk = genreKeysFor(words, rows), per = gk.length>2 ? 10 : 30, seen = new Set();
-    list = [...gk.flatMap(k=>genreTop(rows,k,per)).map(r=>({title:r.title, artist_name:r.artist, cover_url:r.cover, youtube_id:null})), ...list]
-      .filter(t=>{ const k = coreTitle(t.title)+'|'+normText(t.artist_name); return !seen.has(k) && seen.add(k); }).slice(0,60); }
-  host.innerHTML = (list.length ? list.map((tr_,i)=>renderRealTrackRow({rank:i+1, previous_rank:null, tracks:tr_}, i, false)).join('') : '<div class="empty-msg">Aucun résultat dans nos classements.</div>')
-    + (searchFav ? '' : '<div class="section-title"><h2>🍎 Catalogue Apple Music</h2></div><div id="searchApple"><div class="empty-msg">Recherche…</div></div>');
-  if(!searchFav){
-    clearTimeout(radarAppleTimer);
-    const q = document.getElementById('searchInp').value.trim(), rows = await loadRadarRows();
-    radarAppleTimer = setTimeout(()=>loadRadarApple(q, rows, 'searchInp', 'searchApple'), 700);
-  }
+  const q = document.getElementById('searchInp').value.trim();
+  if(!q){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre.</div>'; return; }
+  const e = encodeURIComponent(q);
+  const links = [['Spotify','#1DB954',`https://open.spotify.com/search/${e}`],['Apple Music','#FA243C',`https://music.apple.com/search?term=${e}`],
+    ['YouTube','#FF0000',`https://www.youtube.com/results?search_query=${e}`],['Beatport','#01FF95',`https://www.beatport.com/search?q=${e}`]];
+  host.innerHTML = `<div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
+    <div style="font-size:12px;color:var(--text-muted);">Ouvrir « ${esc(q)} » dans :</div>
+    ${links.map(([n,c,u])=>`<a href="${u}" target="_blank" rel="noopener" class="card" style="display:flex;align-items:center;gap:12px;padding:14px 16px;font-weight:700;"><span style="width:10px;height:10px;border-radius:50%;background:${c};box-shadow:0 0 10px ${c};"></span>${n}<span style="margin-left:auto;color:var(--text-muted);">↗</span></a>`).join('')}
+  </div>`;
 }
 function openSearch(){
   const ov = document.getElementById('searchOv');
-  ov.innerHTML = `<div class="overlay-header"><input id="searchInp" type="search" placeholder="🔍 Artiste ou musique" oninput="renderSearch()" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;margin-right:8px;"><button class="icon-btn" data-action="search-fav" id="searchFavBtn">♡ Favoris</button><button class="icon-btn" data-action="close-search">✕</button></div><div id="searchRes" style="overflow-y:auto;flex:1;padding-bottom:90px;"></div>`;
-  searchFav = false; ov.classList.remove('hidden'); renderSearch();
+  ov.innerHTML = `<div class="overlay-header"><input id="searchInp" type="search" placeholder="🔍 Artiste ou musique" oninput="renderSearch()" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;margin-right:8px;"><button class="icon-btn" data-action="close-search">✕</button></div><div id="searchRes" style="overflow-y:auto;flex:1;padding-bottom:90px;"></div>`;
+  ov.classList.remove('hidden'); renderSearch();
   document.getElementById('searchInp').focus();
 }
 /* ---------------------------- PLAYLISTS ---------------------------- */
@@ -4656,7 +4633,6 @@ document.addEventListener('click', async (e)=>{
   else if(a==='toggle-heart'){ toggleHeart(el.dataset.id); }
   else if(a==='open-search'){ openSearch(); }
   else if(a==='close-search'){ document.getElementById('searchOv').classList.add('hidden'); }
-  else if(a==='search-fav'){ searchFav = !searchFav; el.textContent = searchFav?'♥ Favoris':'♡ Favoris'; renderSearch(); }
   else if(a==='close-track'){ closeTrack(); }
   else if(a==='chart-period'){ state.trackChartPeriod = el.dataset.p; renderTrackOverlay(); }
   else if(a==='toggle-fav'){
