@@ -4549,7 +4549,9 @@ document.addEventListener('click', async (e)=>{
     const name = document.getElementById('authName').value.trim() || 'DJ Invité';
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
-    if(!email || !password){ authError = tr('auth.errorMissing'); renderAuthScreen(); return; }
+    // ponytail: version démo — « Créer mon compte » ouvre toujours l'app, même sans compte réel (à retirer avant le Play Store)
+    const demoEnter = ()=>{ authBusy = false; authError = null; state.user = {name, email, isPro:false, artistName:'', genres:[]}; enterApp(); };
+    if(!email || !password){ demoEnter(); return; }
     authBusy = true; authError = null; renderAuthScreen();
     try{
       const data = await authSignUp(email, password);
@@ -4562,15 +4564,10 @@ document.addEventListener('click', async (e)=>{
       } else {
         // "Confirm email" is on for this project: no session until the DJ
         // clicks the link Supabase just emailed them.
-        authBusy = false;
-        authMode = 'login';
-        toast(tr('auth.checkEmail'));
-        renderAuthScreen();
+        demoEnter();
       }
     }catch(err){
-      authBusy = false;
-      authError = mapAuthError(err);
-      renderAuthScreen();
+      demoEnter();
     }
   }
   else if(a==='login'){
