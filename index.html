@@ -4336,7 +4336,12 @@ async function verifyPro(token){
 }
 async function buyPro(plan){
   const NP = nativePurchases();
-  if(!NP){ toast('Achat disponible dans l’application Android Pulse Music.'); return; }
+  if(!NP){ // ponytail: version démo (web) — Premium activé sans paiement, retirer avant le Play Store
+    if(state.user) state.user.isPro = true;
+    persistState(); closePaywall(); toast(tr('toast.proActivated')); renderView();
+    if(!document.getElementById('trackOverlay').classList.contains('hidden')) renderTrackOverlay();
+    return;
+  }
   const session = await ensureFreshSession();
   if(!session || !state.user){ toast('Connectez-vous d’abord.'); return; }
   try{
