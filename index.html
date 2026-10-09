@@ -279,6 +279,8 @@ html,body{overflow-x:hidden; max-width:100vw;}
 .svgi{ width:1.15em; height:1.15em; display:block; }
 .icon-btn .svgi{ width:17px; height:17px; }
 .nav-btn.active .svgi{ color:var(--brand-a); }
+.icon-btn{ color:#fff; }
+.icon-btn[data-label]::after{ content:attr(data-label); position:absolute; top:calc(100% + 4px); left:50%; transform:translateX(-50%); white-space:nowrap; font-size:9px; font-weight:600; letter-spacing:.2px; color:var(--text-secondary); pointer-events:none; }
 /* ============ THEME CLUB / NÉON (09/10/2026) ============ */
 :root{
   --brand-a:#ff2bd6; --brand-b:#7c3aff;
@@ -2913,7 +2915,7 @@ function renderHome(){
   <div class="topbar">
     <div class="brand-row">
       <div class="brand"><span class="dot"></span>Pulse Music<small>${tr('home.brandSmall')}</small></div>
-      <span style="display:flex;gap:8px;"><button class="icon-btn" data-action="open-shazam" style="background:var(--brand-grad);border-color:transparent;"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg></button><button class="icon-btn" data-action="open-search"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button><button class="icon-btn" data-action="open-dj"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2.5"/><path d="M6.5 12A5.5 5.5 0 0 1 12 6.5M17.5 12a5.5 5.5 0 0 1-5.5 5.5"/></svg></button></span>
+      <span style="display:flex;gap:28px;margin-bottom:14px;margin-right:6px;"><button class="icon-btn" data-action="open-shazam" data-label="Je découvre" style="background:var(--brand-grad);border-color:transparent;"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg></button><button class="icon-btn" data-action="open-search" data-label="Recherche"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button><button class="icon-btn" data-action="open-dj" data-label="Je mixe"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2.5"/><path d="M6.5 12A5.5 5.5 0 0 1 12 6.5M17.5 12a5.5 5.5 0 0 1-5.5 5.5"/></svg></button></span>
     </div>
     <div class="segmented">
       <button class="${state.scope==='world'?'active':''}" data-action="scope" data-scope="world">${tr('home.scopeWorld')}</button>
