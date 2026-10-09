@@ -2861,6 +2861,7 @@ function quickGenreActive(key){
 // Genres qui ont un vrai Top 100 synchronisé (indie-tech n'a pas de classement chez Beatport : reste sur le message d'attente).
 const REAL_GENRE_KEYS = ['afro-house','melodic','house','indie-dance','hard-techno','deep-house','funky-house','minimal-deeptech','progressive-house','disco-house'];
 function activeRealGenreKey(){
+  if(quickGenreActive('all')) return 'all'; // Monde / TOUT = fusion des vrais Top 100 Beatport par genre
   return REAL_GENRE_KEYS.find(k=>quickGenreActive(k)) || null;
 }
 
@@ -3115,6 +3116,7 @@ async function loadHomeCountryList(){
 const genreChartCache = {}; // genre_key -> entries[] (session-only)
 async function fetchGenreChart(genreKey){
   if(genreChartCache[genreKey]) return genreChartCache[genreKey];
+  if(genreKey==='all') return (genreChartCache.all = await fetchWorldMerged());
   try{
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/genre_chart_entries?genre_key=eq.${genreKey}&select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=100`,
@@ -3132,6 +3134,19 @@ async function fetchGenreChart(genreKey){
     genreChartCache[genreKey] = [];
     return [];
   }
+}
+// Monde / TOUT : tous les n°1 des genres, puis tous les n°2, etc. (à rang égal : celui qui monte le plus d'abord).
+// Ainsi un titre ne peut jamais être plus haut en Monde qu'un titre mieux classé dans son propre genre.
+async function fetchWorldMerged(){
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/genre_chart_entries?genre_key=in.(${REAL_GENRE_KEYS.join(',')})&rank=lte.30&select=rank,previous_rank,title,artist_name,cover_url&limit=1000`, { headers: SUPABASE_HEADERS });
+    const rows = await res.json(); if(!Array.isArray(rows)) return [];
+    const up = r => r.previous_rank ? r.previous_rank - r.rank : 0;
+    rows.sort((a,b)=> a.rank-b.rank || up(b)-up(a));
+    const seen = new Set();
+    return rows.filter(r=>{ const k = coreTitle(r.title)+'|'+normText(r.artist_name); return !isPlaceholderTitle(r.title) && !seen.has(k) && seen.add(k); })
+      .slice(0,100).map((r,i)=>({ rank:i+1, previous_rank:null, tracks:{ title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null } }));
+  }catch(e){ return []; }
 }
 async function loadHomeGenreChartList(){
   const genreKey = activeRealGenreKey();
