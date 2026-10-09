@@ -276,6 +276,9 @@ html,body{overflow-x:hidden; max-width:100vw;}
 .barbg{ height:8px; background:rgba(57,135,229,.14); border-radius:5px; width:120px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:8px;}
 .barbg > div{ height:100%; background:var(--series-blue);}
 
+.svgi{ width:1.15em; height:1.15em; display:block; }
+.icon-btn .svgi{ width:17px; height:17px; }
+.nav-btn.active .svgi{ color:var(--brand-a); }
 /* ============ THEME CLUB / NÉON (09/10/2026) ============ */
 :root{
   --brand-a:#ff2bd6; --brand-b:#7c3aff;
@@ -317,12 +320,12 @@ body{ font-family:"Space Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
   <!-- APP -->
   <div id="appScreen" class="app-screen hidden">
     <nav class="top-nav">
-      <button class="nav-btn" data-action="nav" data-view="home"><span class="ic">🏆</span><span data-i18n="nav.top">Top</span></button>
-      <button class="nav-btn" data-action="nav" data-view="nextbig"><span class="ic">🚀</span><span data-i18n="nav.nextbig">Next Big</span></button>
-      <button class="nav-btn" data-action="nav" data-view="explore"><span class="ic">🌍</span><span data-i18n="nav.explore">Explore</span></button>
-      <button class="nav-btn" data-action="nav" data-view="playlists"><span class="ic">🎵</span><span>Playlists</span></button>
-      <button class="nav-btn" data-action="nav" data-view="radar"><span class="ic">📡</span><span data-i18n="nav.radar">Radar</span></button>
-      <button class="nav-btn" data-action="nav" data-view="profile"><span class="ic">👤</span><span data-i18n="nav.profile">Profil</span></button>
+      <button class="nav-btn" data-action="nav" data-view="home"><span class="ic"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg></span><span data-i18n="nav.top">Top</span></button>
+      <button class="nav-btn" data-action="nav" data-view="nextbig"><span class="ic"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg></span><span data-i18n="nav.nextbig">Next Big</span></button>
+      <button class="nav-btn" data-action="nav" data-view="explore"><span class="ic"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span><span data-i18n="nav.explore">Explore</span></button>
+      <button class="nav-btn" data-action="nav" data-view="playlists"><span class="ic"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span><span>Playlists</span></button>
+      <button class="nav-btn" data-action="nav" data-view="radar"><span class="ic"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34M2.29 9.62A10 10 0 1 0 21.31 8.35M16.24 7.76A6 6 0 1 0 8.23 16.67M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/></svg></span><span data-i18n="nav.radar">Radar</span></button>
+      <button class="nav-btn" data-action="nav" data-view="profile"><span class="ic"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span data-i18n="nav.profile">Profil</span></button>
     </nav>
     <main id="view-container"></main>
     <div id="miniPlayer"></div>
@@ -2910,7 +2913,7 @@ function renderHome(){
   <div class="topbar">
     <div class="brand-row">
       <div class="brand"><span class="dot"></span>Pulse Music<small>${tr('home.brandSmall')}</small></div>
-      <span style="display:flex;gap:8px;"><button class="icon-btn" data-action="open-shazam" style="background:var(--brand-grad);border-color:transparent;">👂</button><button class="icon-btn" data-action="open-search">🔍</button><button class="icon-btn" data-action="open-dj">🎛️</button></span>
+      <span style="display:flex;gap:8px;"><button class="icon-btn" data-action="open-shazam" style="background:var(--brand-grad);border-color:transparent;"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/></svg></button><button class="icon-btn" data-action="open-search"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button><button class="icon-btn" data-action="open-dj"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="2.5"/><path d="M6.5 12A5.5 5.5 0 0 1 12 6.5M17.5 12a5.5 5.5 0 0 1-5.5 5.5"/></svg></button></span>
     </div>
     <div class="segmented">
       <button class="${state.scope==='world'?'active':''}" data-action="scope" data-scope="world">${tr('home.scopeWorld')}</button>
