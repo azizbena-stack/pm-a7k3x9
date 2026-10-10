@@ -306,6 +306,10 @@ body{ font-family:"Space Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
 .mini-player .mp-progress > div{ box-shadow:0 0 10px var(--brand-a); }
 ::-webkit-scrollbar-thumb{ background:rgba(255,43,214,.35); }
 ::selection{ background:rgba(255,43,214,.4); }
+/* Effet zoom au survol / au doigt (10/10/2026) */
+.nav-btn,.chip,.icon-btn,.btn,.platform-btn,.close-btn,.segmented button,.radar-tabs button,.brand,.auth-logo{ transition:transform .15s ease; }
+@media (hover:hover){ .nav-btn:hover,.chip:hover,.icon-btn:hover,.btn:hover,.platform-btn:hover,.close-btn:hover,.segmented button:hover,.radar-tabs button:hover,.brand:hover,.auth-logo:hover{ transform:scale(1.08); } }
+.nav-btn:active,.chip:active,.icon-btn:active,.btn:active,.platform-btn:active,.close-btn:active,.segmented button:active,.radar-tabs button:active,.brand:active,.auth-logo:active{ transform:scale(1.12); }
 </style>
 </head>
 <body>
@@ -494,6 +498,7 @@ const cityById = id => CITIES.find(c=>c.id===id);
    in Explore — everywhere else (world/country scope, DJ Score, Trending
    Now) still runs on the simulated catalogue below until that's rebuilt on
    real data too. */
+document.addEventListener('touchstart',()=>{},{passive:true}); // iOS : active l'effet zoom au doigt (:active)
 const SUPABASE_URL = 'https://ysrenidrdyiafnfhpfpg.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_QMAo4k31YfvE2mfGA33Yog_YdG0RLwv';
 const SUPABASE_HEADERS = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
