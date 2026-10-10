@@ -640,7 +640,14 @@ const favMap = lsObj('pm_fav'), seenMap = lsObj('pm_seen');
 function lsSave(){ try{ localStorage.setItem('pm_fav',JSON.stringify(favMap)); localStorage.setItem('pm_seen',JSON.stringify(seenMap)); }catch(e){} }
 function trackMarksHTML(t){
   const k = itKey(t);
-  return `<span class="mk" data-action="add-pl" data-id="${t.id}">＋</span><span class="mk heart${favMap[k]?' on':''}" data-action="toggle-heart" data-id="${t.id}">${favMap[k]?'♥':'♡'}</span><span class="mk seen${seenMap[k]?' on':''}" data-k="${esc(k)}">✓</span>`;
+  return `<span class="mk" data-action="share-track" data-id="${t.id}">↗</span><span class="mk" data-action="add-pl" data-id="${t.id}">＋</span><span class="mk heart${favMap[k]?' on':''}" data-action="toggle-heart" data-id="${t.id}">${favMap[k]?'♥':'♡'}</span><span class="mk seen${seenMap[k]?' on':''}" data-k="${esc(k)}">✓</span>`;
+}
+// Partager un morceau : menu de partage du téléphone (WhatsApp, SMS…), sinon le lien est copié.
+function shareTrack(t){
+  const yt = t.youtubeId || ytLookup(t.title, t.artist), url = yt ? 'https://www.youtube.com/watch?v='+yt : externalSearchUrl('Spotify', t), text = t.title+' — '+t.artist+' (via Pulse Music)';
+  if(navigator.share) navigator.share({title:t.title, text, url}).catch(()=>{});
+  else if(navigator.clipboard) navigator.clipboard.writeText(text+' '+url).then(()=>toast('Lien copié'), ()=>toast(url));
+  else toast(url);
 }
 function markSeen(t){
   const k = itKey(t); if(seenMap[k]) return;
@@ -660,7 +667,7 @@ function renderSearch(){
   const q = document.getElementById('searchInp').value.trim();
   if(!q){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre.</div>'; return; }
   const e = encodeURIComponent(q), name = q.replace(/\S+/g, w=>w[0].toUpperCase()+w.slice(1)); // « black accord » → « Black Accord »
-  const links = [['Spotify','#1DB954',`https://open.spotify.com/search/${e}`],['Apple Music','#FA243C',`https://music.apple.com/search?term=${e}`],
+  const links = [['Spotify','#1DB954',`https://open.spotify.com/search/${e}`],['Apple Music','#FA243C',`https://music.apple.com/search?term=${e}`],['Tidal','#FFFFFF',`https://tidal.com/search?q=${e}`],
     ['YouTube','#FF0000',`https://www.youtube.com/results?search_query=${e}`],['Beatport','#01FF95',`https://www.beatport.com/search?q=${e}`],
     ['Instagram','#E1306C',`https://www.instagram.com/explore/search/keyword/?q=${e}`],['TikTok','#25F4EE',`https://www.tiktok.com/search/user?q=${e}`]];
   host.innerHTML = `<div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
@@ -681,7 +688,7 @@ function renderPlaylists(){
   if(!isPro()) return head + `<div class="hpad" style="margin-top:40px;"><div class="card" style="text-align:center;"><div style="font-size:34px;">🎵🔒</div><h3 style="margin:10px 0 6px;">Playlists réservées aux membres Premium</h3><p style="color:var(--text-muted);font-size:12.5px;line-height:1.6;">Créez vos playlists et ajoutez-y vos morceaux préférés.</p><button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="open-paywall">🔓 Débloquer Premium</button></div></div>`;
   if(plOpen && plMap[plOpen]){
     const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div><span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
-    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div><div class="hpad" style="display:flex;gap:8px;margin:8px 0 10px;"><button class="btn" data-action="pl-yt" style="flex:1;">🔗 Lien YouTube de la playlist</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
+    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div><div class="hpad" style="display:flex;gap:8px;margin:8px 0 10px;"><button class="btn" data-action="pl-yt" style="flex:1;">🔗 Lien YouTube de la playlist</button><button class="btn" data-action="pl-export">⬇️ Exporter</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
   }
   const names = Object.keys(plMap);
   return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><input id="plName" placeholder="Nom de la playlist" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"><button class="btn btn-primary" data-action="pl-create">Créer</button></div>`
@@ -2476,6 +2483,7 @@ function noPreviewHTML(){
       <a style="${b}" href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">YouTube</a>
       <a style="${b}" href="https://music.apple.com/search?term=${q}" target="_blank" rel="noopener">Apple Music</a>
       <a style="${b}" href="https://www.beatport.com/search?q=${q}" target="_blank" rel="noopener">Beatport</a>
+      <a style="${b}" href="https://tidal.com/search?q=${q}" target="_blank" rel="noopener">Tidal</a>
     </div></div>`;
 }
 /* ---------------------------- SOURCE DE LECTURE (Premium) ----------------------------
@@ -2494,6 +2502,7 @@ function externalSearchUrl(p, t){
     AppleMusic: 'https://music.apple.com/search?term='+q,
     Beatport: 'https://www.beatport.com/search?q='+q,
     SoundCloud: 'https://soundcloud.com/search?q='+q,
+    Tidal: 'https://tidal.com/search?q='+q,
   })[p];
 }
 const lockedChoice = (label)=>`<button class="btn btn-outline btn-block" style="text-align:left;display:block;opacity:.8;" data-action="open-paywall">${label} 🔒 Premium<div style="font-size:10.5px;font-weight:600;color:var(--text-muted);margin-top:2px;">Réservé à la version Premium</div></button>`;
@@ -2514,6 +2523,7 @@ function openPlayChoice(id){
       ${b('apple','🍎 Apple Music', "Extrait de 30 s directement dans l'app")}
       ${b('spotify','🟢 Spotify', t.spotifyId ? "Lecteur Spotify dans l'app" : 'Ouvre la recherche Spotify')}
       ${b('beatport','🟠 Beatport','Ouvrir le morceau sur Beatport')}
+      ${b('tidal','⚫ Tidal','Ouvre la recherche Tidal')}
     </div></div>`;
 }
 function playSourceHTML(){
@@ -2857,7 +2867,7 @@ function renderView(){
   if(state.view==='home' && !featuredLoaded){ featuredLoaded = true; loadFeaturedPicks(); }
   document.querySelectorAll('.nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.view===state.view));
   const c = document.getElementById('view-container');
-  if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else if(state.scope==='country') loadHomeCountryList(); else { loadHomeGenreChartList(); loadWorldExtra(); } }
+  if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else if(state.scope==='country') loadHomeCountryList(); else { loadHomeGenreChartList(); loadWorldExtra(); } if(!cityViewId()) loadTrendingReal(); }
   else if(state.view==='nextbig') c.innerHTML = renderNextBig();
   else if(state.view==='explore') c.innerHTML = renderExplore();
   else if(state.view==='playlists') c.innerHTML = renderPlaylists();
@@ -2949,10 +2959,10 @@ function renderHome(){
   <div id="featuredBox">${featuredHTML()}</div>
 
   <div class="section-title"><h2>${tr('home.trendingNow')}</h2>
-    <span class="link" data-action="set-trending-period" data-p="${state.trendingPeriod==='24h'?'7d':state.trendingPeriod==='7d'?'30d':'24h'}">${state.trendingPeriod.toUpperCase()} ⟳</span>
+    <span class="link" id="trendPer" data-action="set-trending-period" data-p="${state.trendingPeriod==='24h'?'7d':state.trendingPeriod==='7d'?'30d':'24h'}">${state.trendingPeriod.toUpperCase()} ⟳</span>
   </div>
   <div style="margin:-6px 18px 10px;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--brand-a);text-shadow:0 0 10px rgba(255,43,214,.45);">${esc(trendGenreLabel())}</div>
-  <div class="hscroll">
+  <div class="hscroll" id="trendBox">
     ${trending.map((t,i)=>`
       ${!isPro()&&i===10?'<div class="next-card" style="flex:0 0 168px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;" data-action="open-paywall">🔓 Débloquer Premium</div>':''}<div class="next-card ${!isPro()&&i>=10?'lock-row':''}" style="flex:0 0 168px;" ${!isPro()&&i>=10?'':`data-action="open-track" data-id="${t.id}"`}>
         <div class="glow"></div>
@@ -3129,6 +3139,31 @@ async function fetchWorldMerged(){
     return rows.filter(r=>{ const k = coreTitle(r.title)+'|'+normText(r.artist_name); return !isPlaceholderTitle(r.title) && !seen.has(k) && seen.add(k); })
       .slice(0,100).map((r,i)=>({ rank:i+1, previous_rank:null, tracks:{ title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null } }));
   }catch(e){ return []; }
+}
+// Trending Now : vraies plus fortes montées (place de la veille → place du jour) du classement affiché (genre(s) Beatport ou pays).
+// Si rien n'est disponible, l'ancien catalogue reste affiché.
+async function loadTrendingReal(){
+  const cc = state.scope==='country' ? state.selectedCountry : null, gk = cc ? null : activeRealGenreKey();
+  if(!cc && !gk) return;
+  const q = cc ? `country_electronic_entries?country_code=eq.${cc}` : `genre_chart_entries?genre_key=${gk==='all' ? 'in.('+REAL_GENRE_KEYS.join(',')+')' : 'eq.'+gk}`;
+  let rows = null;
+  try{ rows = await (await fetch(`${SUPABASE_URL}/rest/v1/${q}&select=rank,previous_rank,title,artist_name,cover_url&limit=1000`, { headers: SUPABASE_HEADERS })).json(); }catch(e){}
+  const box = document.getElementById('trendBox');
+  if(!box || !Array.isArray(rows) || state.view!=='home' || (state.scope==='country' ? state.selectedCountry : null)!==cc || (!cc && activeRealGenreKey()!==gk)) return; // l'utilisateur a changé de vue
+  const up = r => r.previous_rank ? r.previous_rank - r.rank : 0, seen = new Set();
+  const list = rows.filter(r=>up(r)>0 && !isPlaceholderTitle(r.title)).sort((a,b)=>up(b)-up(a) || a.rank-b.rank)
+    .filter(r=>{ const k = coreTitle(r.title)+'|'+normText(r.artist_name); return !seen.has(k) && seen.add(k); }).slice(0,50);
+  if(!list.length) return;
+  box.innerHTML = list.map((r,i)=>{
+    const id = 'trend-'+strSeed(r.title+'|'+r.artist_name), p = DEMO_PROFILES[i % DEMO_PROFILES.length], lk = !isPro() && i>=10;
+    const t = realTracksCache[id] = {id, isRealCity:true, title:r.title, artist:r.artist_name||'', coverUrl:r.cover_url||null, coverSeed:strSeed(r.title+r.artist_name)%9999, genre:cityTrackGenre(r.title, r.artist_name), demoProfile:p, demoBpm:p.bpm, youtubeId:ytLookup(r.title, r.artist_name)};
+    return `${!isPro()&&i===10?'<div class="next-card" style="flex:0 0 168px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;" data-action="open-paywall">🔓 Débloquer Premium</div>':''}<div class="next-card ${lk?'lock-row':''}" style="flex:0 0 168px;" ${lk?'':`data-action="toggle-play" data-id="${id}"`}>
+      <div class="glow"></div>${coverHTML(t,false)}
+      <div style="font-weight:700;font-size:12.5px;margin-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.title)}</div>
+      <div style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(t.artist)}</div>
+      <div style="margin-top:8px;"><span class="t-trend up">▲ ${up(r)} · #${r.rank}</span></div></div>`;
+  }).join('');
+  const per = document.getElementById('trendPer'); if(per){ per.removeAttribute('data-action'); per.textContent = 'VS VEILLE'; }
 }
 async function loadHomeGenreChartList(){
   const genreKey = activeRealGenreKey();
@@ -3484,22 +3519,31 @@ function openArtistStats(name){
   const ov = document.getElementById('searchOv'); if(ov) ov.classList.add('hidden');
   state.view = 'radar'; state.radarTab = 'search'; state.radarArtist = name; state.statsPlatform = 'spotify'; state.statsTab = 'overview'; renderView();
 }
+// Ajouter à l'agenda : petit fichier .ics (journée entière) que le téléphone ouvre dans son Calendrier.
+function icsChip(name, date, place){
+  const d = String(date||'').slice(0,10); if(!/^\d{4}-\d\d-\d\d$/.test(d)) return '';
+  const f = d.replace(/-/g,''), n = new Date(d+'T12:00:00Z'); n.setUTCDate(n.getUTCDate()+1);
+  const x = v => String(v||'').replace(/[\\,;]/g,'\\$&').replace(/\s*\n\s*/g,' ');
+  const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Pulse Music//FR','BEGIN:VEVENT','UID:'+f+'-'+strSeed(name+'|'+place)+'@pulse-music','DTSTAMP:'+f+'T000000Z','DTSTART;VALUE=DATE:'+f,'DTEND;VALUE=DATE:'+n.toISOString().slice(0,10).replace(/-/g,''),'SUMMARY:'+x(name),'LOCATION:'+x(place),'END:VEVENT','END:VCALENDAR'].join('\r\n');
+  return `<a class="chip" download="evenement.ics" href="data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}">📅 Agenda</a>`;
+}
 async function artistEventsHTML(name){
   const h = t=>`<div class="section-title"><h2>${t}</h2></div>`, today = new Date().toISOString().slice(0,10);
   const evt = await fetchSC(name, `/api/v2/artist/{uuid}/events?type=all&sortBy=date&sortOrder=asc&startDate=${today}&endDate=${(+today.slice(0,4)+2)+today.slice(4)}&limit=50`), it = evt ? (evt.data.items||[]) : [];
   if(!it.length){
     // Soundcharts n'a rien : on complète avec Ticketmaster (fonction Supabase `events`)
     let tm = []; try{ tm = (await (await fetch(SUPABASE_URL+'/functions/v1/events?name='+encodeURIComponent(name), {headers:SUPABASE_HEADERS})).json()).items || []; }catch(e){}
-    return tm.length ? h('🎪 Événements à venir (Ticketmaster)') + tm.map(x=>`<div class="alert-item"><div class="aic">🎤</div><div><div class="at">${esc(x.name)}</div><div class="ad">${esc([x.venue, x.city, x.country].filter(Boolean).join(', '))}</div><div class="atime">${esc(x.date)}</div>${x.url ? `<div class="chiprow" style="padding:6px 0 0;"><a class="chip" href="${esc(x.url)}" target="_blank" rel="noopener">🎟️ Billets</a></div>` : ''}</div></div>`).join('') : '';
+    return tm.length ? h('🎪 Événements à venir (Ticketmaster)') + tm.map(x=>`<div class="alert-item"><div class="aic">🎤</div><div><div class="at">${esc(x.name)}</div><div class="ad">${esc([x.venue, x.city, x.country].filter(Boolean).join(', '))}</div><div class="atime">${esc(x.date)}</div><div class="chiprow" style="padding:6px 0 0;">${icsChip(x.name, x.date, [x.venue, x.city, x.country].filter(Boolean).join(', '))}${x.url ? `<a class="chip" href="${esc(x.url)}" target="_blank" rel="noopener">🎟️ Billets</a>` : ''}</div></div></div>`).join('') : '';
   }
-  return h('🎪 Événements / festivals à venir') + it.map(x=>{ const v = x.venue||{}, f = x.festival; return `<div class="alert-item"><div class="aic">${x.type==='festival'?'🎪':'🎤'}</div><div><div class="at">${esc(x.name||'')}</div><div class="ad">${esc([v.name, v.cityName, v.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.date||'').slice(0,10))}</div></div></div>`; }).join('');
+  return h('🎪 Événements / festivals à venir') + it.map(x=>{ const v = x.venue||{}, f = x.festival; return `<div class="alert-item"><div class="aic">${x.type==='festival'?'🎪':'🎤'}</div><div><div class="at">${esc(x.name||'')}</div><div class="ad">${esc([v.name, v.cityName, v.countryName].filter(Boolean).join(', '))}</div><div class="atime">${esc(String(x.date||'').slice(0,10))}</div><div class="chiprow" style="padding:6px 0 0;">${icsChip(x.name, x.date, [v.name, v.cityName, v.countryName].filter(Boolean).join(', '))}</div></div></div>`; }).join('');
 }
 /* ---------------------------- IDENTIFIER (style Shazam) ----------------------------
    Micro → 8 s → fonction Supabase `identify` (AudD) → morceau ajouté au dossier « Morceaux trouvés » (gardé sur l'appareil). */
 const foundList = () => { try{ return JSON.parse(localStorage.getItem('pm_found'))||[]; }catch(e){ return []; } };
+const foundId = x => { const id = 'found-'+strSeed(x.t+'|'+x.a); realTracksCache[id] = {id, title:x.t, artist:x.a, coverUrl:x.cover||null}; return id; }; // pour « ＋ Playlist »
 function foundHTML(){
   const L = foundList();
-  return `<div class="section-title"><h2>📁 Morceaux trouvés (${L.length})</h2></div>` + (L.length ? L.map((x,i)=>`<div class="alert-item">${x.cover ? `<img src="${esc(x.cover)}" alt="" referrerpolicy="no-referrer" style="width:46px;height:46px;border-radius:8px;object-fit:cover;">` : '<div class="aic">🎵</div>'}<div style="flex:1;min-width:0;"><div class="at">${esc(x.t)}</div><div class="ad">${esc(x.a)}</div><div class="atime">${esc(x.d)}</div><div class="chiprow" style="padding:6px 0 0;flex-wrap:wrap;overflow:visible;">${platformLinks(x.a+' '+x.t, x.apple)}<span class="chip" data-action="found-del" data-i="${i}">🗑</span></div></div></div>`).join('') : '<div class="empty-msg">Aucun morceau trouvé pour l\'instant. Touchez le bouton pour identifier un titre.</div>');
+  return `<div class="section-title"><h2>📁 Morceaux trouvés (${L.length})</h2></div>` + (L.length ? L.map((x,i)=>`<div class="alert-item">${x.cover ? `<img src="${esc(x.cover)}" alt="" referrerpolicy="no-referrer" style="width:46px;height:46px;border-radius:8px;object-fit:cover;">` : '<div class="aic">🎵</div>'}<div style="flex:1;min-width:0;"><div class="at">${esc(x.t)}</div><div class="ad">${esc(x.a)}</div><div class="atime">${esc(x.d)}</div><div class="chiprow" style="padding:6px 0 0;flex-wrap:wrap;overflow:visible;">${platformLinks(x.a+' '+x.t, x.apple)}<span class="chip" data-action="add-pl" data-id="${foundId(x)}">＋ Playlist</span><span class="chip" data-action="found-del" data-i="${i}">🗑</span></div></div></div>`).join('') : '<div class="empty-msg">Aucun morceau trouvé pour l\'instant. Touchez le bouton pour identifier un titre.</div>');
 }
 function renderShazam(){
   const host = document.getElementById('radarBody'); if(!host) return;
@@ -3963,7 +4007,7 @@ async function renderRadarSearch(){
 }
 // Artistes et morceaux hors classements : recherche publique Apple Music (gratuite, déjà utilisée pour les extraits).
 const linkChip = (l,u)=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener" style="text-decoration:none;">${l}</a>`;
-const platformLinks = (q, appleUrl)=>{ q = encodeURIComponent(q); return linkChip('🍎 Apple Music', appleUrl || 'https://music.apple.com/search?term='+q) + linkChip('🟢 Spotify','https://open.spotify.com/search/'+q) + linkChip('🟠 Beatport','https://www.beatport.com/search?q='+q); };
+const platformLinks = (q, appleUrl)=>{ q = encodeURIComponent(q); return linkChip('🍎 Apple Music', appleUrl || 'https://music.apple.com/search?term='+q) + linkChip('🟢 Spotify','https://open.spotify.com/search/'+q) + linkChip('🟠 Beatport','https://www.beatport.com/search?q='+q) + linkChip('⚫ Tidal','https://tidal.com/search?q='+q); };
 const fallbackLinks = q => `<div style="padding:8px 18px;"><div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">CHERCHER « ${esc(q)} » SUR</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;">${platformLinks(q)}</div></div>`;
 const radarArtistsHTML = arts => arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,8).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span>${ownsArtist(n) ? `<span class="chip" style="opacity:.7;">✓ Dans mes artistes</span>` : `<span class="chip active" data-action="add-artist" data-n="${esc(n)}">➕ Ajouter à mes artistes</span>`}${platformLinks(n,u)}</div></div>`).join('') : '';
 const radarAppleCache = new Map(); let radarAppleTimer = null;
@@ -4003,7 +4047,11 @@ function radarAlertsHTML(rows){
   const seen = new Set(), top = rows.filter(r=>r.prev!=null && r.prev>r.rank).sort((a,b)=>(b.prev-b.rank)-(a.prev-a.rank)).filter(r=>!seen.has(r.q) && seen.add(r.q)).slice(0,10)
     .map(r=>item('📈',esc(r.title),`${esc(r.artist)} · ${esc(radarWhere(r))} : #${r.rank} (▲ ${r.prev-r.rank})`));
   const h = t=>`<div class="section-title"><h2>${t}</h2></div>`;
-  return h('♥ Vos favoris')
+  const my = myArtists().map(normText).filter(Boolean), art = rows.filter(r=>my.some(a=>r.na.includes(a)) && r.prev!==r.rank).map(r=>{
+    const d = r.prev==null ? null : r.prev-r.rank;
+    return item(d==null?'🆕':d>0?'📈':'📉', esc(r.title)+' · '+esc(r.artist), d==null ? `Nouveau dans ${esc(radarWhere(r))} : #${r.rank}` : `${esc(radarWhere(r))} : #${r.rank} (${d>0?'▲':'▼'} ${Math.abs(d)})`); });
+  return (my.length ? h('🎤 Vos artistes') + (art.join('') || '<div class="empty-msg">Aucun mouvement pour vos artistes pour le moment.</div>') : '')
+    + h('♥ Vos favoris')
     + (!favs.length ? '<div class="empty-msg">Mettez des morceaux en favori ♡ pour suivre leurs mouvements.</div>' : mine.length ? mine.map(m=>m.h).join('') : '<div class="empty-msg">Aucun mouvement sur vos favoris pour le moment.</div>')
     + h('📈 Plus fortes hausses') + (top.join('') || '<div class="empty-msg">Pas encore de mouvements.</div>');
 }
@@ -4633,6 +4681,8 @@ document.addEventListener('click', async (e)=>{
   else if(a==='plq-prev'){ plQNext(-1); }
   else if(a==='pl-del'){ delete plMap[plOpen]; plOpen=null; plSave(); renderView(); }
   else if(a==='pl-rm'){ plMap[plOpen].splice(+el.dataset.i,1); plSave(); renderView(); }
+  else if(a==='share-track'){ const t = TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]; if(t) shareTrack(t); }
+  else if(a==='pl-export'){ const L = plMap[plOpen]||[], u = URL.createObjectURL(new Blob(['\ufeff'+L.map((f,i)=>(i+1)+'. '+f.artist+' - '+f.title).join('\r\n')], {type:'text/plain'})), x = document.createElement('a'); x.href = u; x.download = plOpen+'.txt'; document.body.appendChild(x); x.click(); x.remove(); setTimeout(()=>URL.revokeObjectURL(u), 2000); }
   else if(a==='add-pl'){ if(!isPro()) openPaywall(); else openAddPl(el.dataset.id); }
   else if(a==='pl-add'){ addToPl(el.dataset.id, el.dataset.n); }
   else if(a==='toggle-heart'){ toggleHeart(el.dataset.id); }
@@ -4665,7 +4715,7 @@ document.addEventListener('click', async (e)=>{
   }
   else if(a==='play-with'){
     document.getElementById('playChoice').classList.add('hidden');
-    if(el.dataset.s==='beatport'){ const tt = TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]; if(tt) window.open(externalSearchUrl('Beatport', tt), '_blank', 'noopener'); }
+    if(el.dataset.s==='beatport'||el.dataset.s==='tidal'){ const tt = TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]; if(tt) window.open(externalSearchUrl(el.dataset.s==='tidal'?'Tidal':'Beatport', tt), '_blank', 'noopener'); }
     else togglePlay(el.dataset.id, el.dataset.s);
   }
   else if(a==='close-play-choice'){ document.getElementById('playChoice').classList.add('hidden'); }
@@ -4736,11 +4786,16 @@ document.addEventListener('change', (e)=>{
   if(e.target.dataset.action==='select-city'){ state.selectedCity = e.target.value; renderView(); }
 });
 
+// À l'ouverture : prévient s'il y a du nouveau sur vos artistes / favoris (même calcul que Radar → Alertes, sans les « Plus fortes hausses »).
+function radarAlertToast(){
+  if(!Object.keys(favMap).length && !myArtists().length) return;
+  loadRadarRows().then(rows=>{ const n = (radarAlertsHTML(rows).split('📈 Plus fortes hausses')[0].match(/class="alert-item"/g)||[]).length; if(n) toast('🔔 '+n+' alerte(s) : voir Radar → Alertes'); }).catch(()=>{});
+}
 function enterApp(){
   document.getElementById('authScreen').classList.add('hidden');
   document.getElementById('appScreen').classList.remove('hidden');
   state.view='home';
-  renderView();
+  renderView(); radarAlertToast();
 }
 
 /* init: render immediately on the auth screen, then light up real persistence
