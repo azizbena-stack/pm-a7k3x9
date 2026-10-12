@@ -668,7 +668,7 @@ function renderSearch(){
   const q = document.getElementById('searchInp').value.trim();
   if(!q){ host.innerHTML = '<div class="empty-msg">Tapez un artiste ou un titre.</div>'; return; }
   const e = encodeURIComponent(q), name = q.replace(/\S+/g, w=>w[0].toUpperCase()+w.slice(1)); // « black accord » → « Black Accord »
-  const links = [['Spotify','#1DB954',`https://open.spotify.com/search/${e}`],['Apple Music','#FA243C',`https://music.apple.com/search?term=${e}`],['Tidal','#FFFFFF',`https://tidal.com/search?q=${e}`],
+  const links = [['Spotify','#1DB954',`https://open.spotify.com/search/${e}`],['Apple Music','#FA243C',`https://music.apple.com/search?term=${e}`],['Tidal','#FFFFFF',`https://tidal.com/search?q=${e}`],['Amazon Music','#25D1DA',`https://music.amazon.com/search/${e}`],
     ['YouTube','#FF0000',`https://www.youtube.com/results?search_query=${e}`],['Beatport','#01FF95',`https://www.beatport.com/search?q=${e}`],
     ['Instagram','#E1306C',`https://www.instagram.com/explore/search/keyword/?q=${e}`],['TikTok','#25F4EE',`https://www.tiktok.com/search/user?q=${e}`]];
   host.innerHTML = `<div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
@@ -2486,6 +2486,7 @@ function noPreviewHTML(){
       <a style="${b}" href="https://music.apple.com/search?term=${q}" target="_blank" rel="noopener">Apple Music</a>
       <a style="${b}" href="https://www.beatport.com/search?q=${q}" target="_blank" rel="noopener">Beatport</a>
       <a style="${b}" href="https://tidal.com/search?q=${q}" target="_blank" rel="noopener">Tidal</a>
+      <a style="${b}" href="https://music.amazon.com/search/${q}" target="_blank" rel="noopener">Amazon Music</a>
     </div></div>`;
 }
 /* ---------------------------- SOURCE DE LECTURE (Premium) ----------------------------
@@ -2505,6 +2506,7 @@ function externalSearchUrl(p, t){
     Beatport: 'https://www.beatport.com/search?q='+q,
     SoundCloud: 'https://soundcloud.com/search?q='+q,
     Tidal: 'https://tidal.com/search?q='+q,
+    'Amazon Music': 'https://music.amazon.com/search/'+q,
   })[p];
 }
 const lockedChoice = (label)=>`<button class="btn btn-outline btn-block" style="text-align:left;display:block;opacity:.8;" data-action="open-paywall">${label} 🔒 Premium<div style="font-size:10.5px;font-weight:600;color:var(--text-muted);margin-top:2px;">Réservé à la version Premium</div></button>`;
@@ -2526,6 +2528,7 @@ function openPlayChoice(id){
       ${b('spotify','🟢 Spotify', t.spotifyId ? "Lecteur Spotify dans l'app" : 'Ouvre la recherche Spotify')}
       ${b('beatport','🟠 Beatport','Ouvrir le morceau sur Beatport')}
       ${b('tidal','⚫ Tidal','Ouvre la recherche Tidal')}
+      ${b('amazon','🔵 Amazon Music','Ouvre la recherche Amazon Music')}
     </div></div>`;
 }
 function playSourceHTML(){
@@ -2855,7 +2858,7 @@ function quickGenreActive(key){
 // chart réel accessible depuis l'app pour ces 2-là.
 // Genres qui ont un vrai Top 100 synchronisé (indie-tech n'a pas de classement chez Beatport : reste sur le message d'attente).
 // « + Genres » (12/10/2026) : classements Apple Music par genre et par pays via Soundcharts (fonction Supabase clever-processor = genre-chart.ts).
-const MORE_GENRES = [['am:pop-126','POP'],['am:hip-hop-rap-116','RAP FRANÇAIS'],['am:hip-hop-rap-173','RAP US'],['am:variete-francaise','VARIÉTÉ FRANÇAISE'],['am:latino-1','LATINO / REGGAETON'],['am:r-b-soul-113','R&B / SOUL'],['am:reggae-7','REGGAE'],['am:rock-124','ROCK'],['am:k-pop-122','K-POP'],['am:alternative-111','ALTERNATIVE'],['am:country-95','COUNTRY'],['am:jazz-109','JAZZ']];
+const MORE_GENRES = [['am:pop-126','POP'],['am:hip-hop-rap-116','RAP FRANÇAIS'],['am:hip-hop-rap-173','RAP US'],['am:variete-francaise','VARIÉTÉ FRANÇAISE'],['am:latino-1','LATINO / REGGAETON'],['am:r-b-soul-113','R&B / SOUL'],['am:reggae-7','REGGAE'],['am:rock-124','ROCK'],['am:k-pop-122','K-POP'],['am:alternative-111','ALTERNATIVE'],['am:country-95','COUNTRY'],['am:jazz-109','JAZZ'],['am:amazon-top-200-song-all-genres','TOP AMAZON MUSIC']];
 Object.assign(CHART_GENRE_LABEL, Object.fromEntries(MORE_GENRES));
 const REAL_GENRE_KEYS = ['afro-house','melodic','house','indie-dance','hard-techno','deep-house','funky-house','minimal-deeptech','progressive-house','disco-house'];
 function activeRealGenreKey(){
@@ -3119,7 +3122,7 @@ async function fetchGenreChart(genreKey){
   if(genreKey.startsWith('am:')){
     try{
       const d = await (await fetch(SUPABASE_URL+'/functions/v1/clever-processor?slug='+encodeURIComponent(genreKey.slice(3)), { headers: SUPABASE_HEADERS })).json();
-      return (genreChartCache[genreKey] = (d.items||[]).map(r=>({ rank: r.rank, previous_rank: r.prev, tracks: { title: r.title, artist_name: r.artist, cover_url: r.cover, youtube_id: null } })));
+      return (genreChartCache[genreKey] = (d.items||[]).sort((a,b)=>a.rank-b.rank).map(r=>({ rank: r.rank, previous_rank: r.prev, tracks: { title: r.title, artist_name: r.artist, cover_url: r.cover, youtube_id: null } })));
     }catch(e){ return []; }
   }
   try{
@@ -4205,7 +4208,7 @@ async function renderRadarSearch(){
 }
 // Artistes et morceaux hors classements : recherche publique Apple Music (gratuite, déjà utilisée pour les extraits).
 const linkChip = (l,u)=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener" style="text-decoration:none;">${l}</a>`;
-const platformLinks = (q, appleUrl)=>{ q = encodeURIComponent(q); return linkChip('🍎 Apple Music', appleUrl || 'https://music.apple.com/search?term='+q) + linkChip('🟢 Spotify','https://open.spotify.com/search/'+q) + linkChip('🟠 Beatport','https://www.beatport.com/search?q='+q) + linkChip('⚫ Tidal','https://tidal.com/search?q='+q); };
+const platformLinks = (q, appleUrl)=>{ q = encodeURIComponent(q); return linkChip('🍎 Apple Music', appleUrl || 'https://music.apple.com/search?term='+q) + linkChip('🟢 Spotify','https://open.spotify.com/search/'+q) + linkChip('🟠 Beatport','https://www.beatport.com/search?q='+q) + linkChip('⚫ Tidal','https://tidal.com/search?q='+q) + linkChip('🔵 Amazon Music','https://music.amazon.com/search/'+q); };
 const fallbackLinks = q => `<div style="padding:8px 18px;"><div style="font-size:11px;color:var(--text-muted);font-weight:800;margin-bottom:6px;">CHERCHER « ${esc(q)} » SUR</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;">${platformLinks(q)}</div></div>`;
 const radarArtistsHTML = arts => arts.size ? '<div style="font-size:11px;color:var(--text-muted);font-weight:800;padding:6px 18px 0;">👤 ARTISTES</div>' + [...arts].slice(0,8).map(([n,u])=>`<div style="padding:8px 18px;"><div style="font-weight:800;font-size:13.5px;margin-bottom:6px;">${esc(n)}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span>${ownsArtist(n) ? `<span class="chip" style="opacity:.7;">✓ Dans mes artistes</span>` : `<span class="chip active" data-action="add-artist" data-n="${esc(n)}">➕ Ajouter à mes artistes</span>`}${platformLinks(n,u)}</div></div>`).join('') : '';
 const radarAppleCache = new Map(); let radarAppleTimer = null;
@@ -4858,7 +4861,7 @@ document.addEventListener('click', async (e)=>{
   }
   else if(a==='play-with'){
     document.getElementById('playChoice').classList.add('hidden');
-    if(el.dataset.s==='beatport'||el.dataset.s==='tidal'){ const tt = TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]; if(tt) window.open(externalSearchUrl(el.dataset.s==='tidal'?'Tidal':'Beatport', tt), '_blank', 'noopener'); }
+    if(el.dataset.s==='beatport'||el.dataset.s==='tidal'||el.dataset.s==='amazon'){ const tt = TRACKS.find(x=>x.id===el.dataset.id) || realTracksCache[el.dataset.id]; if(tt) window.open(externalSearchUrl({tidal:'Tidal',amazon:'Amazon Music'}[el.dataset.s]||'Beatport', tt), '_blank', 'noopener'); }
     else togglePlay(el.dataset.id, el.dataset.s);
   }
   else if(a==='close-play-choice'){ document.getElementById('playChoice').classList.add('hidden'); }
