@@ -2830,7 +2830,7 @@ function setQuickGenre(key){
   if(key==='all'){ /* empty = all */ }
   else if(key==='melodic'){ state.genreFilters.add('melodic-house'); state.genreFilters.add('melodic-techno'); }
   else if(key==='afro-house'){ state.genreFilters.add('afro-house'); }
-  else if(genreById(key)){ state.genreFilters.add(key); }
+  else if(genreById(key) || key.startsWith('am:')){ state.genreFilters.add(key); }
   renderView();
 }
 function trendGenreLabel(){
@@ -2854,10 +2854,13 @@ function quickGenreActive(key){
 // catalogue de ces 2 genres (demande explicite) — plus de chip, plus de
 // chart réel accessible depuis l'app pour ces 2-là.
 // Genres qui ont un vrai Top 100 synchronisé (indie-tech n'a pas de classement chez Beatport : reste sur le message d'attente).
+// « + Genres » (12/10/2026) : classements Apple Music par genre et par pays via Soundcharts (fonction Supabase clever-processor = genre-chart.ts).
+const MORE_GENRES = [['am:pop-126','POP'],['am:hip-hop-rap-116','RAP FRANÇAIS'],['am:hip-hop-rap-173','RAP US'],['am:variete-francaise','VARIÉTÉ FRANÇAISE'],['am:latino-1','LATINO / REGGAETON'],['am:r-b-soul-113','R&B / SOUL'],['am:reggae-7','REGGAE'],['am:rock-124','ROCK'],['am:k-pop-122','K-POP'],['am:alternative-111','ALTERNATIVE'],['am:country-95','COUNTRY'],['am:jazz-109','JAZZ']];
+Object.assign(CHART_GENRE_LABEL, Object.fromEntries(MORE_GENRES));
 const REAL_GENRE_KEYS = ['afro-house','melodic','house','indie-dance','hard-techno','deep-house','funky-house','minimal-deeptech','progressive-house','disco-house'];
 function activeRealGenreKey(){
   if(quickGenreActive('all')) return 'all'; // Monde / TOUT = fusion des vrais Top 100 Beatport par genre
-  return REAL_GENRE_KEYS.find(k=>quickGenreActive(k)) || null;
+  return REAL_GENRE_KEYS.find(k=>quickGenreActive(k)) || MORE_GENRES.map(g=>g[0]).find(k=>quickGenreActive(k)) || null;
 }
 
 /* ============================================================================
@@ -2955,7 +2958,9 @@ function renderHome(){
       <div class="chip ${quickGenreActive('minimal-deeptech')?'active':''}" data-action="quickgenre" data-g="minimal-deeptech">MINIMAL</div>
       <div class="chip ${quickGenreActive('progressive-house')?'active':''}" data-action="quickgenre" data-g="progressive-house">PROGRESSIVE</div>
       <div class="chip ${quickGenreActive('disco-house')?'active':''}" data-action="quickgenre" data-g="disco-house">DISCO HOUSE</div>
-    </div>`}
+      <div class="chip ${state.moreGenres||MORE_GENRES.some(g=>quickGenreActive(g[0]))?'active':''}" data-action="more-genres">+ GENRES</div>
+    </div>
+    ${state.moreGenres||MORE_GENRES.some(g=>quickGenreActive(g[0])) ? `<div class="chiprow">${MORE_GENRES.map(([k,n])=>`<div class="chip ${quickGenreActive(k)?'active':''}" data-action="quickgenre" data-g="${k}">${n}</div>`).join('')}</div>` : ''}`}
   </div>
 
   <div id="featuredBox">${featuredHTML()}</div>
@@ -3111,6 +3116,12 @@ const genreChartCache = {}; // genre_key -> entries[] (session-only)
 async function fetchGenreChart(genreKey){
   if(genreChartCache[genreKey]) return genreChartCache[genreKey];
   if(genreKey==='all') return (genreChartCache.all = await fetchWorldMerged());
+  if(genreKey.startsWith('am:')){
+    try{
+      const d = await (await fetch(SUPABASE_URL+'/functions/v1/clever-processor?slug='+encodeURIComponent(genreKey.slice(3)), { headers: SUPABASE_HEADERS })).json();
+      return (genreChartCache[genreKey] = (d.items||[]).map(r=>({ rank: r.rank, previous_rank: r.prev, tracks: { title: r.title, artist_name: r.artist, cover_url: r.cover, youtube_id: null } })));
+    }catch(e){ return []; }
+  }
   try{
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/genre_chart_entries?genre_key=eq.${genreKey}&select=rank,previous_rank,title,artist_name,cover_url&order=rank.asc&limit=100`,
@@ -3149,7 +3160,8 @@ async function loadTrendingReal(){
   if(!cc && !gk) return;
   const q = cc ? `country_electronic_entries?country_code=eq.${cc}` : `genre_chart_entries?genre_key=${gk==='all' ? 'in.('+REAL_GENRE_KEYS.join(',')+')' : 'eq.'+gk}`;
   let rows = null;
-  try{ rows = await (await fetch(`${SUPABASE_URL}/rest/v1/${q}&select=rank,previous_rank,title,artist_name,cover_url&limit=1000`, { headers: SUPABASE_HEADERS })).json(); }catch(e){}
+  if(gk && gk.startsWith('am:')) rows = (await fetchGenreChart(gk)).map(e=>({ rank: e.rank, previous_rank: e.previous_rank, title: e.tracks.title, artist_name: e.tracks.artist_name, cover_url: e.tracks.cover_url }));
+  else try{ rows = await (await fetch(`${SUPABASE_URL}/rest/v1/${q}&select=rank,previous_rank,title,artist_name,cover_url&limit=1000`, { headers: SUPABASE_HEADERS })).json(); }catch(e){}
   const box = document.getElementById('trendBox');
   if(!box || !Array.isArray(rows) || state.view!=='home' || (state.scope==='country' ? state.selectedCountry : null)!==cc || (!cc && activeRealGenreKey()!==gk)) return; // l'utilisateur a changé de vue
   const up = r => r.previous_rank ? r.previous_rank - r.rank : 0, seen = new Set();
@@ -4268,6 +4280,7 @@ function renderProfile(){
       <div class="field"><label>${tr('profile.genresPlayed')}</label>
         <div class="genre-check-grid" id="pf_genres">
           ${GENRES.map(g=>`<div class="gcheck" data-g="${g.id}" style="color:${g.color}" data-action="toggle-pf-genre">${g.name}</div>`).join('')}
+          ${['Reggaeton','Pop','Bachata','Funk','Disco','Variété française','Zouk','Latino','Rap français','Rap US'].map(n=>`<div class="gcheck" data-g="${n}" style="color:#00f0ff" data-action="toggle-pf-genre">${n}</div>`).join('')}
         </div>
       </div>
       <div class="field"><label>${tr('profile.instagram')}</label><input id="pf_ig" type="text" placeholder="@toncompte"></div>
@@ -4792,6 +4805,7 @@ document.addEventListener('click', async (e)=>{
   else if(a==='period'){ state.period = el.dataset.period; renderView(); }
   else if(a==='city-period'){ state.cityPeriod = el.dataset.period; renderView(); }
   else if(a==='quickgenre'){ setQuickGenre(el.dataset.g); }
+  else if(a==='more-genres'){ state.moreGenres = !state.moreGenres; if(!state.moreGenres && MORE_GENRES.some(g=>quickGenreActive(g[0]))) setQuickGenre('all'); else renderView(); }
   else if(a==='open-genre-sheet'){ openGenreSheet(); }
   else if(a==='close-genre-sheet'){ document.getElementById('genreOverlay').classList.add('hidden'); renderView(); }
   else if(a==='toggle-adv-genre'){
