@@ -2875,7 +2875,7 @@ function renderView(){
   else if(state.view==='playlists') c.innerHTML = renderPlaylists();
   else if(state.view==='radar'){ c.innerHTML = renderRadar(); loadRadar(); }
   else if(state.view==='discover'){ c.innerHTML = '<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Je découvre</div></div></div><div id="radarBody"></div><div style="height:10px;"></div>'; renderShazam(); }
-  else if(state.view==='dj'){ c.innerHTML = djHTML(); ['A','B'].forEach(k=>DJ[k] && DJ[k].yt && DJ[k].yt.mount()); }
+  else if(state.view==='dj'){ c.innerHTML = djHTML(); ['A','B'].forEach(k=>DJ[k] && DJ[k].yt && DJ[k].yt.mount()); djRecUI(); djMixList(); }
   else if(state.view==='profile') c.innerHTML = renderProfile();
   c.scrollTop = 0;
 }
@@ -3783,6 +3783,49 @@ function djFx(k, n){
   const seq = [0,.5,1,2]; d.fx.v[n] = seq[(seq.indexOf(d.fx.v[n])+1)%4]; djFxApply(k);
   const e = document.getElementById('djFx'+k+n), c = e && e.dataset.c, v = d.fx.v[n]; if(e){ e.style.background = v ? c : c+'33'; e.style.color = v ? '#000' : '#fff'; e.innerHTML = e.dataset.l+'<br>'+djFxLbl(v); }
 }
+/* Enregistrer le mix (12/10/2026) : la sortie de MIX (platines + EQ + effets + crossfader) est enregistrée
+   telle qu'on l'entend, puis rangée dans le dossier « Mes mixes » (sur l'appareil, IndexedDB). */
+let djRecorder = null, djRecStart = 0, djRecTick = null;
+const mixDb = () => new Promise((ok,ko)=>{ const r = indexedDB.open('pm_mixes',1); r.onupgradeneeded = ()=>r.result.createObjectStore('mixes',{keyPath:'id', autoIncrement:true}); r.onsuccess = ()=>ok(r.result); r.onerror = ()=>ko(r.error); });
+const mixTx = async (mode, fn) => { const db = await mixDb(); return new Promise((ok,ko)=>{ const tx = db.transaction('mixes', mode), st = tx.objectStore('mixes'), q = fn(st); tx.oncomplete = ()=>ok(q && q.result); tx.onerror = ()=>ko(tx.error); }); };
+const fmtDur = s => Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+function djRec(){
+  if(djRecorder){ djRecorder.stop(); return; }
+  if(!window.MediaRecorder){ toast('Enregistrement non disponible sur ce navigateur'); return; }
+  if(!djCtx){ djCtx = new (window.AudioContext||window.webkitAudioContext)(); djMaster = djCtx.createGain(); djMaster.connect(djCtx.destination); }
+  if(djCtx.state==='suspended') djCtx.resume();
+  const dest = djCtx.createMediaStreamDestination(); djMaster.connect(dest);
+  const type = ['audio/webm;codecs=opus','audio/mp4','audio/webm'].find(t=>MediaRecorder.isTypeSupported(t)) || '';
+  const rec = djRecorder = new MediaRecorder(dest.stream, type ? {mimeType:type} : undefined), parts = [];
+  rec.ondataavailable = e=>{ if(e.data && e.data.size) parts.push(e.data); };
+  rec.onstop = async ()=>{
+    clearInterval(djRecTick); try{ djMaster.disconnect(dest); }catch(e){}
+    const dur = (Date.now()-djRecStart)/1000, blob = new Blob(parts, {type: rec.mimeType || type || 'audio/webm'}); djRecorder = null; djRecUI();
+    if(dur<2 || !blob.size){ toast('Mix trop court : rien enregistré'); return; }
+    const d = new Date(), names = [DJ.A && DJ.A.t, DJ.B && DJ.B.t].filter(Boolean);
+    try{ await mixTx('readwrite', st=>st.add({name:'Mix du '+d.toLocaleDateString('fr-FR')+' à '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}), tracks:names.join(' · '), date:d.toISOString(), dur, blob})); toast('Mix enregistré dans « Mes mixes »'); }
+    catch(e){ toast('Espace insuffisant : mix non enregistré'); }
+    djMixList();
+  };
+  rec.start(1000); djRecStart = Date.now(); djRecTick = setInterval(djRecUI, 1000); djRecUI();
+}
+function djRecUI(){
+  const b = document.getElementById('djRecBtn'); if(!b) return;
+  b.innerHTML = djRecorder ? '⏹ Arrêter l\'enregistrement · '+fmtDur((Date.now()-djRecStart)/1000) : '⏺ Enregistrer le mix';
+  b.style.background = djRecorder ? '#e11d48' : ''; b.style.color = djRecorder ? '#fff' : '';
+}
+async function djMixList(){
+  const host = document.getElementById('djMixes'); if(!host) return;
+  let list = []; try{ list = await mixTx('readonly', st=>st.getAll()) || []; }catch(e){}
+  if(!document.body.contains(host)) return;
+  host.innerHTML = `<div class="section-title"><h2>📁 Mes mixes (${list.length})</h2></div>` + (list.length ? list.reverse().map(m=>{ const u = URL.createObjectURL(m.blob), ext = /mp4/.test(m.blob.type) ? 'm4a' : 'webm';
+    return `<div class="hpad" style="margin-bottom:10px;"><div class="card" style="padding:12px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><div style="min-width:0;"><div style="font-weight:800;font-size:13px;">🎧 ${esc(m.name)}</div><div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${fmtDur(m.dur)}${m.tracks ? ' · '+esc(m.tracks) : ''}</div></div>
+      <div style="display:flex;gap:6px;flex:none;"><a class="chip" href="${u}" download="${esc(m.name.replace(/[\/:]/g,'-'))}.${ext}">⬇️</a><span class="chip" onclick="djMixDel(${m.id})">🗑</span></div></div>
+      <audio controls preload="none" src="${u}" style="width:100%;margin-top:8px;height:36px;"></audio></div></div>`; }).join('')
+    : '<div class="empty-msg">Aucun mix enregistré. Lancez vos platines puis touchez ⏺ Enregistrer le mix.</div>');
+}
+async function djMixDel(id){ try{ await mixTx('readwrite', st=>st.delete(id)); }catch(e){} djMixList(); }
 function djDeck(k){
   if(DJ[k]) return DJ[k];
   if(!djCtx){ djCtx = new (window.AudioContext||window.webkitAudioContext)(); djMaster = djCtx.createGain(); djMaster.connect(djCtx.destination); }
@@ -3820,12 +3863,14 @@ function djHTML(){
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-top:8px;">${pads}</div></div>`; };
   return `<style>.djsp{animation:djspin 2.2s linear infinite}@keyframes djspin{to{transform:rotate(360deg)}}.djk{width:36px;height:36px;border-radius:50%;margin:0 auto;background:radial-gradient(#3a3a48,#14141c);border:2px solid #555;touch-action:none;position:relative}.djk i{position:absolute;left:50%;top:2px;width:3px;height:10px;margin-left:-1.5px;background:#fff;border-radius:2px}</style>
   <div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>🎛️ MIX</div></div></div>
+  <div class="hpad" style="margin-top:6px;"><button id="djRecBtn" class="btn btn-block" onclick="djRec()">⏺ Enregistrer le mix</button></div>
   ${djAuto ? `<div class="hpad" style="margin-top:8px;"><button class="btn btn-block" onclick="djAutoStop(true);renderView()">⏹ Arrêter le mix automatique</button></div>` : ''}
   <div class="hpad" style="margin:8px 0;"><input id="djFile" type="file" accept="audio/*,.mp3,.m4a,.wav,.flac,.aac,.ogg" multiple hidden onchange="djFiles(this.files);this.value=''"><div id="djDrop" ondragover="event.preventDefault();this.style.borderColor='#22d3ee'" ondragleave="this.style.borderColor=''" ondrop="event.preventDefault();this.style.borderColor='';djFiles(event.dataTransfer.files)" onclick="document.getElementById('djFile').click()" style="border:2px dashed var(--border);border-radius:14px;padding:14px;text-align:center;font-weight:800;font-size:13px;cursor:pointer;">📁 Choisir de la musique (téléphone / ordinateur)<div style="font-size:10px;color:var(--text-muted);font-weight:600;margin-top:3px;">ou glissez-déposez vos fichiers ici</div></div></div>
   <div id="djRes" class="hpad" style="max-height:210px;overflow:auto;">${djResHTML()}</div>
   <div class="hpad" style="display:flex;gap:8px;">${deck('A','#22d3ee')}${deck('B','#facc15')}</div>
   <div class="hpad" style="display:flex;gap:8px;margin-top:8px;">${['A','B'].map(k=>`<div style="flex:1;min-width:0;text-align:center;"><div id="djY${k}"></div><div id="djL${k}">${djLnk(DJ[k])}</div></div>`).join('')}</div>
   <div class="hpad" style="margin:12px 0;text-align:center;"><div style="font-size:11px;font-weight:800;color:var(--text-muted);">A &nbsp;◀ CROSSFADER ▶&nbsp; B</div><input id="djXf" type="range" min="0" max="100" value="${djX}" oninput="djX=+this.value;djLevel()" style="width:100%;"></div>
+  <div id="djMixes"></div>
   <div style="height:20px;"></div>`;
 }
 const djResHTML = () => djRes.length ? djRes.map((r,i)=>`<div class="alert-item" style="align-items:center;"><div class="aic"><img src="${esc((r.artworkUrl100||''))}" alt="" style="width:36px;height:36px;border-radius:8px;"></div><div style="min-width:0;flex:1;"><div class="at" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.trackName)}</div><div class="ad">${esc(r.artistName)}${djFull && !ytLookup(r.trackName, r.artistName) ? ' · <i>pas de version complète</i>' : ''}</div></div><button class="icon-btn" onclick="djLoad('A',${i})">→A</button><button class="icon-btn" onclick="djLoad('B',${i})">→B</button></div>`).join('') : '<div class="empty-msg">Choisissez ou glissez des fichiers audio, puis chargez-les sur la platine A ou B.</div>';
