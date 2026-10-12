@@ -2521,7 +2521,7 @@ function openPlayChoice(id){
         <div style="font-size:11.5px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(t.artist||'')}</div></div>
       <button class="close-btn" data-action="close-play-choice">✕</button></div>
     <div style="display:flex;flex-direction:column;gap:9px;">
-      ${b('youtube','▶️ YouTube', t.youtubeId ? "Lecteur YouTube dans l'app" : 'Ouvre la recherche YouTube')}
+      ${b('youtube','▶️ YouTube', "Lecteur YouTube dans l'app")}
       ${b('apple','🍎 Apple Music', "Extrait de 30 s directement dans l'app")}
       ${b('spotify','🟢 Spotify', t.spotifyId ? "Lecteur Spotify dans l'app" : 'Ouvre la recherche Spotify')}
       ${b('beatport','🟠 Beatport','Ouvrir le morceau sur Beatport')}
@@ -2597,6 +2597,7 @@ async function togglePlay(id, forcedSource){
   }
   if(src==='youtube'){
     if(!t.youtubeId) t.youtubeId = ytLookup(t.title, t.artist);
+    if(!t.youtubeId){ try{ t.youtubeId = (await (await fetch(SUPABASE_URL+'/functions/v1/yt-search?q='+encodeURIComponent((t.artist||'')+' '+t.title), {headers:SUPABASE_HEADERS})).json()).id || null; }catch(e){} }
     if(t.youtubeId){ stopPlayback(); state.playingId = id; state.playingEmbed = 'youtube'; updatePlayerUI(); return; }
     window.open(externalSearchUrl('YouTube', t), '_blank', 'noopener'); return;
   }
