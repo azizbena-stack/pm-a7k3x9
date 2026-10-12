@@ -114,7 +114,7 @@ button{font-family:inherit;}
 .rank{ width:22px; text-align:center; font-weight:800; font-size:13px; color:var(--text-muted); flex:0 0 22px;}
 .rank.top3{ color:#ffd76a; font-size:15px;}
 .cover{ width:46px;height:46px;border-radius:11px; flex:0 0 46px; display:flex;align-items:center;justify-content:center; font-weight:800; font-size:14px; color:rgba(255,255,255,.92); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);}
-.cover.lg{ width:120px;height:120px;border-radius:20px; font-size:34px; box-shadow: 0 20px 40px -15px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.14);}
+.cover.lg{ width:120px;height:120px;flex:0 0 120px;border-radius:20px; font-size:34px; box-shadow: 0 20px 40px -15px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.14);}
 .cover-wrap{ position:relative; flex:0 0 auto; display:inline-flex;}
 .play-overlay{ position:absolute; right:-3px; bottom:-3px; width:19px;height:19px;border-radius:50%; background:rgba(8,8,12,.88); border:1.5px solid rgba(255,255,255,.3); color:#fff; display:flex;align-items:center;justify-content:center; font-size:8.5px; cursor:pointer; padding:0; line-height:1;}
 .play-overlay.lg{ width:46px;height:46px; right:-8px; bottom:-8px; font-size:17px; border-width:2px; background:var(--brand-grad); border-color:rgba(255,255,255,.35); color:#050508; box-shadow:0 8px 20px -6px rgba(139,92,246,.7);}
@@ -605,6 +605,7 @@ async function fetchRealCityChart(appCityId, platform, period){
 }
 
 function realTrackMoveHTML(rank, prev){
+  if(prev===0) return `<span class="t-trend up">NEW</span>`; // nouvelle entrée dans le classement
   if(prev==null || prev===rank) return `<span class="t-trend flat">–</span>`;
   if(prev > rank) return `<span class="t-trend up">▲ ${prev-rank}</span>`;
   return `<span class="t-trend down">▼ ${rank-prev}</span>`;
@@ -687,8 +688,9 @@ function renderPlaylists(){
   const head = `<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Playlists</div></div></div>`;
   if(!isPro()) return head + `<div class="hpad" style="margin-top:40px;"><div class="card" style="text-align:center;"><div style="font-size:34px;">🎵🔒</div><h3 style="margin:10px 0 6px;">Playlists réservées aux membres Premium</h3><p style="color:var(--text-muted);font-size:12.5px;line-height:1.6;">Créez vos playlists et ajoutez-y vos morceaux préférés.</p><button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="open-paywall">🔓 Débloquer Premium</button></div></div>`;
   if(plOpen && plMap[plOpen]){
-    const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div><span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
-    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div><div class="hpad" style="display:flex;gap:8px;margin:8px 0 10px;"><button class="btn" data-action="pl-yt" style="flex:1;">🔗 Lien YouTube de la playlist</button><button class="btn" data-action="pl-export">⬇️ Exporter</button></div><div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
+    const rows = plMap[plOpen].map((f,i)=>`<div style="display:flex;align-items:center;"><div style="flex:1;min-width:0;">${renderRealTrackRow({rank:i+1, previous_rank:null, tracks:{title:f.title, artist_name:f.artist, cover_url:null, youtube_id:null}}, i, false)}</div>${f.bpm?`<span class="tabular" style="font-size:11px;font-weight:800;color:var(--neon-cyan);white-space:nowrap;">${f.bpm} BPM</span>`:''}<span class="mk" data-action="pl-rm" data-i="${i}" style="margin-right:12px;">✕</span></div>`).join('');
+    const setBar = `<div class="hpad" style="margin:0 0 10px;"><button class="btn btn-block" data-action="pl-set">🎚️ Préparer un set : trier par tempo (BPM)</button><div id="setStatus" style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:6px;">${plMap[plOpen].some(f=>f.bpm) ? 'Trié du plus lent au plus rapide : lancez « Mix dans l\'ordre ».' : 'Mesure le tempo de chaque titre sur son extrait Apple Music.'}</div></div>`;
+    return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><button class="btn" data-action="pl-back">← Retour</button><button class="btn" data-action="pl-del">Supprimer la playlist</button></div><div class="hpad" style="display:flex;gap:8px;margin:0 0 10px;"><button class="btn btn-primary" data-action="pl-mix" data-s="1" style="flex:1;">🔀 Mix aléatoire</button><button class="btn" data-action="pl-mix" data-s="0" style="flex:1;">🎛️ Mix dans l'ordre</button></div><div class="hpad" style="display:flex;gap:8px;margin:8px 0 10px;"><button class="btn" data-action="pl-yt" style="flex:1;">🔗 Lien YouTube de la playlist</button><button class="btn" data-action="pl-export">⬇️ Exporter</button></div>` + setBar + `<div class="section-title"><h2>${esc(plOpen)}</h2></div>` + (rows || '<div class="empty-msg">Playlist vide : touchez ＋ sur un morceau pour l\'ajouter.</div>');
   }
   const names = Object.keys(plMap);
   return head + `<div class="hpad" style="display:flex;gap:8px;margin:10px 0;"><input id="plName" placeholder="Nom de la playlist" style="flex:1;background:var(--card-2);border:1px solid var(--border);color:#fff;padding:10px 12px;border-radius:12px;font-size:14px;"><button class="btn btn-primary" data-action="pl-create">Créer</button></div>`
@@ -738,7 +740,7 @@ function renderRealTrackRow(entry, idx, locked){
   <div class="track-row ${locked?'lock-row':''}" style="padding-left:0;" ${locked?'':`data-action="toggle-play" data-id="${rid}"`}>
     <div class="rank ${idx<3?'top3':''}">${idx<3? ['🥇','🥈','🥉'][idx] : (idx+1)}</div>
     ${coverHTML(t2,false)}
-    <div class="t-info">
+    <div class="t-info" ${locked?'':`data-action="real-track" data-id="${rid}"`}>
       <div class="t-title">${esc(t2.title)}</div>
       <div class="t-sub">${esc(t2.artist)}</div>
     </div>
@@ -1357,7 +1359,7 @@ const I18N = {
     'profile.proDj': `Premium`,
     'profile.free': `FREE`,
     'profile.goProTitle': `⭐ Passe Premium`,
-    'profile.goProDesc': `Top 100 complet, Next Big Tracks, historique 90 jours, alertes illimitées, My Radar complet.`,
+    'profile.goProDesc': `Top 100 complet, Next Big Tracks, Trending complet, playlists et mix automatique, statistiques d'artistes en détail.`,
     'profile.viewProOffer': `Voir l'offre Premium`,
     'profile.topPlayed': `Top morceaux joués`,
     'profile.similarDjs': `DJs au style similaire`,
@@ -1421,7 +1423,7 @@ const I18N = {
     'paywall.activate': `Activer Premium (démo)`,
     'paywall.later': `Plus tard`,
     'paywall.labelOffer': `Offre Label/Artiste avec analytics avancés disponible sur demande.`,
-    'paywall.f1': `Top 100 complet`, 'paywall.f2': `Tous les genres, pays &amp; villes`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `Historique 90 jours`, 'paywall.f5': `Alertes illimitées`, 'paywall.f6': `My Radar complet`, 'paywall.f7': `Statistiques avancées`,
+    'paywall.f1': `Top 100 complet`, 'paywall.f2': `10 genres et 30 pays, chaque jour`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `🔥 Trending Now complet`, 'paywall.f5': `🎵 Playlists + mix automatique`, 'paywall.f6': `📊 Statistiques d'artistes complètes`, 'paywall.f7': `Pays, villes et playlists de chaque artiste`,
     'toast.addedToRadar': `Ajouté à ton Radar 📡`,
     'toast.proActivated': `🎉 Premium activé (démo) — tout est débloqué !`,
     'toast.profileCreated': `Profil DJ créé ✅`,
@@ -1511,7 +1513,7 @@ const I18N = {
     'profile.proDj': `Premium`,
     'profile.free': `FREE`,
     'profile.goProTitle': `⭐ Go Premium`,
-    'profile.goProDesc': `Full Top 100, Next Big Tracks, 90-day history, unlimited alerts, full My Radar.`,
+    'profile.goProDesc': `Full Top 100, Next Big Tracks, full Trending, playlists and auto-mix, detailed artist stats.`,
     'profile.viewProOffer': `See the Premium offer`,
     'profile.topPlayed': `Most played tracks`,
     'profile.similarDjs': `DJs with a similar style`,
@@ -1575,7 +1577,7 @@ const I18N = {
     'paywall.activate': `Activate Premium (demo)`,
     'paywall.later': `Later`,
     'paywall.labelOffer': `Label/Artist offer with advanced analytics available on request.`,
-    'paywall.f1': `Full Top 100`, 'paywall.f2': `All genres, countries &amp; cities`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `90-day history`, 'paywall.f5': `Unlimited alerts`, 'paywall.f6': `Full My Radar`, 'paywall.f7': `Advanced stats`,
+    'paywall.f1': `Full Top 100`, 'paywall.f2': `10 genres and 30 countries, daily`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `🔥 Full Trending Now`, 'paywall.f5': `🎵 Playlists + auto-mix`, 'paywall.f6': `📊 Full artist stats`, 'paywall.f7': `Each artist's countries, cities and playlists`,
     'toast.addedToRadar': `Added to your Radar 📡`,
     'toast.proActivated': `🎉 Premium activated (demo) — everything is unlocked!`,
     'toast.profileCreated': `DJ profile created ✅`,
@@ -1665,7 +1667,7 @@ const I18N = {
     'profile.proDj': `Premium`,
     'profile.free': `FREE`,
     'profile.goProTitle': `⭐ Pásate a Premium`,
-    'profile.goProDesc': `Top 100 completo, Próximos Hits, historial de 90 días, alertas ilimitadas, Radar completo.`,
+    'profile.goProDesc': `Top 100 completo, Próximos Hits, Trending completo, playlists y mezcla automática, estadísticas detalladas de artistas.`,
     'profile.viewProOffer': `Ver la oferta Premium`,
     'profile.topPlayed': `Temas más escuchados`,
     'profile.similarDjs': `DJs con estilo similar`,
@@ -1729,7 +1731,7 @@ const I18N = {
     'paywall.activate': `Activar Premium (demo)`,
     'paywall.later': `Más tarde`,
     'paywall.labelOffer': `Oferta Sello/Artista con analíticas avanzadas disponible bajo petición.`,
-    'paywall.f1': `Top 100 completo`, 'paywall.f2': `Todos los géneros, países &amp; ciudades`, 'paywall.f3': `🚀 Próximos Hits`, 'paywall.f4': `Historial de 90 días`, 'paywall.f5': `Alertas ilimitadas`, 'paywall.f6': `Radar completo`, 'paywall.f7': `Estadísticas avanzadas`,
+    'paywall.f1': `Top 100 completo`, 'paywall.f2': `10 géneros y 30 países, cada día`, 'paywall.f3': `🚀 Próximos Hits`, 'paywall.f4': `🔥 Trending Now completo`, 'paywall.f5': `🎵 Playlists + mezcla automática`, 'paywall.f6': `📊 Estadísticas completas de artistas`, 'paywall.f7': `Países, ciudades y playlists de cada artista`,
     'toast.addedToRadar': `Añadido a tu Radar 📡`,
     'toast.proActivated': `🎉 Premium activado (demo) — ¡todo desbloqueado!`,
     'toast.profileCreated': `Perfil DJ creado ✅`,
@@ -1819,7 +1821,7 @@ const I18N = {
     'profile.proDj': `Premium`,
     'profile.free': `FREE`,
     'profile.goProTitle': `⭐ Werde Premium`,
-    'profile.goProDesc': `Komplette Top 100, Next Big Tracks, 90-Tage-Verlauf, unbegrenzte Meldungen, komplettes My Radar.`,
+    'profile.goProDesc': `Komplette Top 100, Next Big Tracks, komplettes Trending, Playlists und Auto-Mix, detaillierte Künstler-Statistiken.`,
     'profile.viewProOffer': `Premium-Angebot ansehen`,
     'profile.topPlayed': `Meistgespielte Tracks`,
     'profile.similarDjs': `DJs mit ähnlichem Stil`,
@@ -1883,7 +1885,7 @@ const I18N = {
     'paywall.activate': `Premium aktivieren (Demo)`,
     'paywall.later': `Später`,
     'paywall.labelOffer': `Label-/Künstlerangebot mit erweiterten Analytics auf Anfrage erhältlich.`,
-    'paywall.f1': `Komplette Top 100`, 'paywall.f2': `Alle Genres, Länder &amp; Städte`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `90-Tage-Verlauf`, 'paywall.f5': `Unbegrenzte Meldungen`, 'paywall.f6': `Komplettes My Radar`, 'paywall.f7': `Erweiterte Statistiken`,
+    'paywall.f1': `Komplette Top 100`, 'paywall.f2': `10 Genres und 30 Länder, täglich`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `🔥 Komplettes Trending Now`, 'paywall.f5': `🎵 Playlists + Auto-Mix`, 'paywall.f6': `📊 Komplette Künstler-Statistiken`, 'paywall.f7': `Länder, Städte und Playlists jedes Künstlers`,
     'toast.addedToRadar': `Zu deinem Radar hinzugefügt 📡`,
     'toast.proActivated': `🎉 Premium aktiviert (Demo) — alles freigeschaltet!`,
     'toast.profileCreated': `DJ-Profil erstellt ✅`,
@@ -2868,8 +2870,8 @@ function renderView(){
   document.querySelectorAll('.nav-btn').forEach(b=> b.classList.toggle('active', b.dataset.view===state.view));
   const c = document.getElementById('view-container');
   if(state.view==='home') { c.innerHTML = renderHome(); if(cityViewId()) loadHomeCityList(); else if(state.scope==='country') loadHomeCountryList(); else { loadHomeGenreChartList(); loadWorldExtra(); } if(!cityViewId()) loadTrendingReal(); }
-  else if(state.view==='nextbig') c.innerHTML = renderNextBig();
-  else if(state.view==='explore') c.innerHTML = renderExplore();
+  else if(state.view==='nextbig'){ c.innerHTML = renderNextBig(); if(isPro()) loadNextBigReal(); }
+  else if(state.view==='explore'){ c.innerHTML = renderExplore(); loadExploreTops(); }
   else if(state.view==='playlists') c.innerHTML = renderPlaylists();
   else if(state.view==='radar'){ c.innerHTML = renderRadar(); loadRadar(); }
   else if(state.view==='discover'){ c.innerHTML = '<div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>Je découvre</div></div></div><div id="radarBody"></div><div style="height:10px;"></div>'; renderShazam(); }
@@ -2952,7 +2954,6 @@ function renderHome(){
       <div class="chip ${quickGenreActive('minimal-deeptech')?'active':''}" data-action="quickgenre" data-g="minimal-deeptech">MINIMAL</div>
       <div class="chip ${quickGenreActive('progressive-house')?'active':''}" data-action="quickgenre" data-g="progressive-house">PROGRESSIVE</div>
       <div class="chip ${quickGenreActive('disco-house')?'active':''}" data-action="quickgenre" data-g="disco-house">DISCO HOUSE</div>
-      <div class="chip ghost" data-action="open-genre-sheet">${tr('home.chipMoreGenres')}</div>
     </div>`}
   </div>
 
@@ -2974,7 +2975,7 @@ function renderHome(){
   </div>
 
   <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' 100 '+(state.countryCity?cityById(state.countryCity).name:cname(state.selectedCountry)).toUpperCase():''}</h2>
-    ${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}
+    <span style="display:flex;gap:12px;align-items:center;"><span class="link" data-action="story-chart">📸 Story</span>${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}</span>
   </div>
   ${cityViewId() ? `
   <div class="track-list" id="homeCityList">
@@ -3136,7 +3137,7 @@ async function fetchWorldMerged(){
     const up = r => r.previous_rank ? r.previous_rank - r.rank : 0;
     rows.sort((a,b)=> a.rank-b.rank || up(b)-up(a));
     const seen = new Set();
-    return rows.filter(r=>{ const k = coreTitle(r.title)+'|'+normText(r.artist_name); return !isPlaceholderTitle(r.title) && !seen.has(k) && seen.add(k); })
+    return rows.filter(r=>{ const k = chartKey(r.title, r.artist_name); return !isPlaceholderTitle(r.title) && !seen.has(k) && seen.add(k); })
       .slice(0,100).map((r,i)=>({ rank:i+1, previous_rank:null, tracks:{ title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null } }));
   }catch(e){ return []; }
 }
@@ -3152,7 +3153,7 @@ async function loadTrendingReal(){
   if(!box || !Array.isArray(rows) || state.view!=='home' || (state.scope==='country' ? state.selectedCountry : null)!==cc || (!cc && activeRealGenreKey()!==gk)) return; // l'utilisateur a changé de vue
   const up = r => r.previous_rank ? r.previous_rank - r.rank : 0, seen = new Set();
   const list = rows.filter(r=>up(r)>0 && !isPlaceholderTitle(r.title)).sort((a,b)=>up(b)-up(a) || a.rank-b.rank)
-    .filter(r=>{ const k = coreTitle(r.title)+'|'+normText(r.artist_name); return !seen.has(k) && seen.add(k); }).slice(0,50);
+    .filter(r=>{ const k = chartKey(r.title, r.artist_name); return !seen.has(k) && seen.add(k); }).slice(0,50);
   if(!list.length) return;
   box.innerHTML = list.map((r,i)=>{
     const id = 'trend-'+strSeed(r.title+'|'+r.artist_name), p = DEMO_PROFILES[i % DEMO_PROFILES.length], lk = !isPro() && i>=10;
@@ -3209,80 +3210,232 @@ function renderNextBig(){
       </div>
     </div>`;
   }
-  const list = TRACKS.filter(t=>t.isNextBig).sort((a,b)=>b.growth14d-a.growth14d);
   return `
   <div class="topbar">
-    <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('nextbig.title')}<small>${tr('nextbig.subtitle')}</small></div></div>
-    <div class="chiprow">
-      <div class="chip active">${tr('home.chipAll')}</div>
-    </div>
+    <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('nextbig.title')}<small>${tr('nextbig.subtitle')}</small></div><button class="icon-btn" data-action="story-nb" title="Story Instagram">📸</button></div>
   </div>
-  <div class="hpad" style="display:flex;flex-direction:column;gap:12px;margin-top:8px;">
-    ${list.length===0? `<div class="empty-msg">${tr('nextbig.empty')}</div>` : list.map((t,i)=>{
-      const tl = trendLabel(t.growth14d);
-      return `
-      <div class="card" data-action="open-track" data-id="${t.id}" style="cursor:pointer;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-          <div style="display:flex;gap:12px;">
+  <div style="font-size:11px;color:var(--text-muted);padding:0 18px 8px;line-height:1.5;">Les titres qui grimpent le plus vite depuis hier dans tous nos classements (10 genres Beatport + 30 pays Apple Music Dance).</div>
+  <div id="nextBigList" class="hpad" style="display:flex;flex-direction:column;gap:12px;margin-top:4px;"><div class="empty-msg">Chargement…</div></div>
+  <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:10px;">Powered by Soundcharts</div>
+  <div style="height:10px;"></div>`;
+}
+const RG_NAMES = {'afro-house':'Afro House','melodic':'Melodic','house':'House','indie-dance':'Indie Dance','hard-techno':'Hard Techno','deep-house':'Deep House','funky-house':'Funky House','minimal-deeptech':'Minimal','progressive-house':'Progressive','disco-house':'Disco House'};
+// Next Big : vrais titres en pleine montée, tous classements confondus (genres Beatport + pays Apple Music Dance).
+// Seulement les titres pas encore dans un Top 10. Score = places gagnées depuis la veille (plafonnées à 60 par classement) + 20 par nouvelle entrée + 5 par classement où le titre figure.
+async function loadNextBigReal(){
+  const rows = await loadRadarRows();
+  const host = document.getElementById('nextBigList');
+  if(!host || state.view!=='nextbig') return;
+  const m = {};
+  rows.forEach(r=>{
+    if(r.kind==='g' && !RG_NAMES[r.key]) return;
+    const k = chartKey(r.title, r.artist), x = m[k] || (m[k] = {title:r.title, artist:r.artist, cover:r.cover, up:0, news:0, best:999, g:new Set(), c:new Set()});
+    if(r.prev) x.up += Math.min(60, Math.max(0, r.prev - r.rank)); else x.news++;
+    x.best = Math.min(x.best, r.rank);
+    (r.kind==='g' ? x.g : x.c).add(r.key);
+  });
+  const list = Object.values(m).filter(x=>(x.up>0 || x.news>0) && x.best>10).map(x=>Object.assign(x, {score: x.up + x.news*20 + (x.g.size + x.c.size)*5})).sort((a,b)=>b.score-a.score).slice(0,30);
+  nbLast = list;
+  if(!list.length){ host.innerHTML = `<div class="empty-msg">${tr('nextbig.empty')}</div>`; return; }
+  host.innerHTML = list.map((x,i)=>{
+    const id = 'nb-'+strSeed(x.title+'|'+x.artist), p = DEMO_PROFILES[i % DEMO_PROFILES.length];
+    const t = realTracksCache[id] = {id, isRealCity:true, title:x.title, artist:x.artist, coverUrl:x.cover||null, coverSeed:strSeed(x.title+x.artist)%9999, genre:cityTrackGenre(x.title, x.artist), demoProfile:p, demoBpm:p.bpm, youtubeId:ytLookup(x.title, x.artist)};
+    const where = [...x.g].map(k=>RG_NAMES[k]).concat([...x.c].map(cc=>(countryByCode(cc)||{}).flag||cc)).slice(0,8).join(' · ');
+    const tag = x.score>=80 ? '🚀 EXPLOSE' : x.score>=40 ? '📈 EN FORTE HAUSSE' : '↗ MONTE';
+    return `
+      <div class="card" data-action="real-track" data-id="${id}" style="cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div style="display:flex;gap:12px;min-width:0;">
             ${coverHTML(t,false)}
-            <div>
-              <div style="font-size:11px;color:var(--text-muted);font-weight:800;">#${i+1} — ${genreById(t.genre).name.toUpperCase()}</div>
-              <div style="font-weight:800;font-size:14.5px;margin-top:2px;">${esc(t.title)}</div>
-              <div style="font-size:11.5px;color:var(--text-muted);">${esc(t.artist)}</div>
+            <div style="min-width:0;">
+              <div style="font-size:11px;color:var(--text-muted);font-weight:800;">#${i+1} — MEILLEURE PLACE #${x.best}</div>
+              <div style="font-weight:800;font-size:14.5px;margin-top:2px;">${esc(x.title)}</div>
+              <div style="font-size:11.5px;color:var(--text-muted);">${esc(x.artist)}</div>
             </div>
           </div>
-          <span class="trend-pill ${tl.cls}">${tl.icon} ${tl.txt}</span>
+          <span class="trend-pill up" style="white-space:nowrap;">${tag}</span>
         </div>
         <div style="display:flex; gap:20px; margin-top:14px;">
-          <div><div style="font-size:17px;font-weight:800;color:var(--good-text);" class="tabular">${fmtPct(Math.round(t.growth14d))}</div><div style="font-size:10px;color:var(--text-muted);">${tr('nextbig.days14')}</div></div>
-          <div><div style="font-size:17px;font-weight:800;" class="tabular">${fmtNum(t.djsPlaying)}</div><div style="font-size:10px;color:var(--text-muted);">${tr('nextbig.djs')}</div></div>
-          <div><div style="font-size:17px;font-weight:800;" class="tabular">${t.countriesCount}</div><div style="font-size:10px;color:var(--text-muted);">${tr('nextbig.countries')}</div></div>
+          <div><div style="font-size:17px;font-weight:800;color:var(--good-text);" class="tabular">+${x.up}</div><div style="font-size:10px;color:var(--text-muted);">places depuis hier</div></div>
+          <div><div style="font-size:17px;font-weight:800;" class="tabular">${x.news}</div><div style="font-size:10px;color:var(--text-muted);">nouvelles entrées</div></div>
+          <div><div style="font-size:17px;font-weight:800;" class="tabular">${x.g.size + x.c.size}</div><div style="font-size:10px;color:var(--text-muted);">classements</div></div>
+          <div><div style="font-size:17px;font-weight:800;" class="tabular">${x.c.size}</div><div style="font-size:10px;color:var(--text-muted);">${tr('nextbig.countries')}</div></div>
         </div>
-        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);font-size:11.5px;color:var(--text-secondary);">${tr('nextbig.adoptionNote')}</div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);font-size:11px;color:var(--text-secondary);">${esc(where)}</div>
       </div>`;
-    }).join('')}
-  </div>
-  <div style="height:10px;"></div>`;
+  }).join('');
+}
+
+/* ============================================================================
+   FICHE MORCEAU RÉELLE · NOUVEAUTÉS · STORY · PRÉPARER UN SET (12/10/2026)
+   ============================================================================ */
+// Clé commune à tous les classements (genres Beatport + pays Apple Music) : titre sans version + 1er artiste.
+// Beatport écrit « HUGEL, SOLTO », Apple « HUGEL & SOLTO » : sans ça un même titre compterait deux fois.
+const leadArtist = a => String(a||'').split(/\s*(?:,|&|\bx\b|\bfeat\.?|\bft\.?|\bwith\b)\s*/i)[0].trim();
+const chartKey = (title, artist) => coreTitle(title)+'|'+normText(leadArtist(artist));
+const chartRowsFor = (rows, title, artist) => { const k = chartKey(title, artist); return rows.filter(r=>(r.kind==='c' || RG_NAMES[r.key]) && chartKey(r.title, r.artist)===k).sort((a,b)=>a.rank-b.rank); };
+const chartWhere = r => r.kind==='g' ? '🎧 '+RG_NAMES[r.key]+' · Beatport' : ((countryByCode(r.key)||{}).flag||'🌍')+' '+cname(r.key)+' · Apple Music Dance';
+let rtStory = null;
+async function openRealTrack(id){
+  const t = realTracksCache[id]; if(!t) return;
+  const ov = document.getElementById('trackOverlay'); ov.classList.remove('hidden');
+  ov.innerHTML = `
+    <div class="overlay-header">
+      <button class="close-btn" data-action="close-track">✕</button>
+      <div style="font-size:11px;font-weight:800;color:var(--text-muted);letter-spacing:.6px;">${tr('track.detailTitle')}</div>
+      <button class="close-btn" data-action="story-track" title="Story Instagram">📸</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;">
+      <div style="text-align:center;padding:6px 24px 10px;">
+        ${coverHTML(t,true)}
+        <h2 style="margin:14px 0 2px;font-size:19px;">${esc(t.title)}</h2>
+        <div style="color:var(--text-muted);font-size:13px;">${esc(t.artist)}</div>
+      </div>
+      <div class="hpad" style="display:flex;gap:8px;">
+        <button class="btn btn-primary" style="flex:1;" data-action="toggle-play" data-id="${id}">▶ Écouter</button>
+        <button class="btn" data-action="add-pl" data-id="${id}">＋ Playlist</button>
+        <button class="btn" data-action="share-track" data-id="${id}">↗</button>
+      </div>
+      <div id="rtBody"><div class="empty-msg">Chargement…</div></div>
+      <div class="hpad" style="margin-top:12px;"><button class="btn btn-block" data-action="rt-artist" data-n="${esc(leadArtist(t.artist))}">📊 Statistiques de ${esc(leadArtist(t.artist))}</button></div>
+      <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:10px;">Powered by Soundcharts</div>
+      <div style="height:20px;"></div>
+    </div>`;
+  const rows = await loadRadarRows();
+  const host = document.getElementById('rtBody'); if(!host || ov.classList.contains('hidden')) return;
+  const mine = chartRowsFor(rows, t.title, t.artist);
+  rtStory = { title:t.title, sub:t.artist, lines: mine.slice(0,8).map(r=>({rank:r.rank, title:chartWhere(r).replace(/^\S+\s/,''), sub: r.prev ? (r.prev>r.rank ? '▲ '+(r.prev-r.rank)+' depuis hier' : r.prev<r.rank ? '▼ '+(r.rank-r.prev)+' depuis hier' : '= depuis hier') : 'Nouvelle entrée'})) };
+  if(!mine.length){ host.innerHTML = '<div class="empty-msg">Ce titre n\'est dans aucun de nos classements aujourd\'hui (10 genres Beatport, 30 pays Apple Music Dance).</div>'; return; }
+  const up = mine.reduce((s,r)=>s+(r.prev ? r.prev-r.rank : 0),0), news = mine.filter(r=>!r.prev).length, nC = new Set(mine.filter(r=>r.kind==='c').map(r=>r.key)).size;
+  const tile = (v,l)=>`<div class="stat-tile"><div class="label">${l}</div><div class="value tabular">${v}</div></div>`;
+  host.innerHTML = `
+    <div class="hpad" style="display:flex;gap:9px;margin-top:14px;">${tile('#'+mine[0].rank,'Meilleure place')}${tile(mine.length,'Classements')}${tile(nC,'Pays')}</div>
+    <div class="hpad" style="margin-top:9px;">${tile((up>0?'+':'')+up+(news?' · '+news+' NEW':''),'Places gagnées depuis hier')}</div>
+    <div class="section-title"><h2>🏆 Dans nos classements</h2></div>
+    <div class="hpad"><div class="card">${mine.map(r=>`<div class="locrow"><div class="rk">#${r.rank}</div><div class="nm" style="flex:1;">${esc(chartWhere(r))}</div>${realTrackMoveHTML(r.rank, r.prev==null ? 0 : r.prev)}</div>`).join('')}</div></div>`;
+}
+
+// Radar → Mes artistes : dernières sorties (catalogue public Apple Music).
+async function loadArtistNews(names){
+  const host = document.getElementById('radarBody'); if(!host || !names.length) return;
+  host.insertAdjacentHTML('beforeend', '<div class="section-title"><h2>🆕 Nouveautés de mes artistes</h2></div><div id="artistNews" class="track-list"><div class="empty-msg">Chargement…</div></div>');
+  const all = [];
+  for(const n of names.slice(0,5)){ const l = await fetchArtistCatalog(n); if(l) all.push(...l); }
+  const box = document.getElementById('artistNews'); if(!box) return;
+  const seen = new Set(), news = all.filter(x=>x.releaseDate && new Date(x.releaseDate)<=new Date()).sort((a,b)=>b.releaseDate.localeCompare(a.releaseDate)).filter(x=>{ const k = chartKey(x.trackName, x.artistName); return !seen.has(k) && seen.add(k); }).slice(0,10);
+  if(!news.length){ box.innerHTML = '<div class="empty-msg">Aucune sortie trouvée sur Apple Music.</div>'; return; }
+  box.innerHTML = news.map((x,i)=>{
+    const id = 'new-'+x.trackId, p = DEMO_PROFILES[i % DEMO_PROFILES.length], cover = (x.artworkUrl100||'').replace('100x100','300x300') || null;
+    const t = realTracksCache[id] = {id, isRealCity:true, title:x.trackName, artist:x.artistName, coverUrl:cover, coverSeed:x.trackId%9999, genre:cityTrackGenre(x.trackName, x.artistName), demoProfile:p, demoBpm:p.bpm, youtubeId:ytLookup(x.trackName, x.artistName)};
+    if(x.previewUrl) itStorePut(t, {previewUrl:x.previewUrl, trackViewUrl:x.trackViewUrl||null, artwork:cover});
+    const d = new Date(x.releaseDate);
+    return `<div class="track-row" style="padding-left:0;" data-action="toggle-play" data-id="${id}">
+      <div class="rank" style="font-size:10px;line-height:1.3;">${d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}<br>${d.getFullYear()}</div>
+      ${coverHTML(t,false)}
+      <div class="t-info" data-action="real-track" data-id="${id}"><div class="t-title">${esc(x.trackName)}</div><div class="t-sub">${esc(x.artistName)}${x.collectionName && x.collectionName!==x.trackName ? ' · '+esc(x.collectionName) : ''}</div></div>
+      <div class="t-right">${trackMarksHTML(t)}</div></div>`;
+  }).join('') + '<div style="text-align:center;font-size:10px;color:var(--text-muted);margin:6px 0;">Source : Apple Music</div>';
+}
+
+// Story Instagram (1080×1920) aux couleurs de l'app : partage direct sur téléphone, sinon téléchargement de l'image.
+async function makeStory(title, sub, lines){
+  try{ await Promise.all([document.fonts.load('800 80px Unbounded'), document.fonts.load('700 40px "Space Grotesk"'), document.fonts.load('400 30px "Space Grotesk"')]); }catch(e){}
+  const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+  g.fillStyle = '#05030a'; g.fillRect(0,0,W,H);
+  const glow = (x,y,r,c)=>{ const rg = g.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,c); rg.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(0,0,W,H); };
+  glow(150,-50,900,'rgba(255,43,214,.35)'); glow(1000,250,700,'rgba(0,240,255,.20)'); glow(540,2000,1000,'rgba(124,58,255,.40)');
+  const grad = g.createLinearGradient(80,0,1000,0); grad.addColorStop(0,'#ff2bd6'); grad.addColorStop(.55,'#7c3aff'); grad.addColorStop(1,'#00f0ff');
+  const fit = (s,max)=>{ s = String(s||''); if(g.measureText(s).width<=max) return s; while(s.length>1 && g.measureText(s+'…').width>max) s = s.slice(0,-1); return s+'…'; };
+  g.textBaseline = 'alphabetic';
+  g.fillStyle = grad; g.beginPath(); g.arc(98,150,14,0,7); g.fill();
+  g.fillStyle = '#fff'; g.font = '800 44px Unbounded, sans-serif'; g.fillText('PULSE MUSIC', 128, 166);
+  g.fillStyle = '#00f0ff'; g.font = '700 24px "Space Grotesk", sans-serif'; g.fillText('MUSIC INTELLIGENCE', 84, 214);
+  g.shadowColor = 'rgba(255,43,214,.6)'; g.shadowBlur = 30; g.fillStyle = grad;
+  g.font = '800 76px Unbounded, sans-serif'; g.fillText(fit(title, W-168), 84, 380);
+  g.shadowBlur = 0; g.fillStyle = '#d9d3e6'; g.font = '500 38px "Space Grotesk", sans-serif'; g.fillText(fit(sub, W-168), 84, 446);
+  let y = 560; const step = Math.min(128, Math.floor(1180/Math.max(1,lines.length)));
+  lines.forEach(l=>{
+    g.fillStyle = 'rgba(14,11,22,.85)'; g.strokeStyle = 'rgba(255,43,214,.25)'; g.lineWidth = 2;
+    g.beginPath(); g.roundRect ? g.roundRect(70, y-6, W-140, step-18, 24) : g.rect(70, y-6, W-140, step-18); g.fill(); g.stroke();
+    g.fillStyle = grad; g.font = '800 46px Unbounded, sans-serif'; g.fillText('#'+l.rank, 100, y+56);
+    g.fillStyle = '#fff'; g.font = '700 38px "Space Grotesk", sans-serif'; g.fillText(fit(l.title, W-400), 270, y+46);
+    g.fillStyle = '#a59fb4'; g.font = '400 29px "Space Grotesk", sans-serif'; g.fillText(fit(l.sub, W-400), 270, y+86);
+    y += step;
+  });
+  g.fillStyle = '#a59fb4'; g.font = '500 26px "Space Grotesk", sans-serif';
+  g.fillText(new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}), 84, H-90);
+  g.textAlign = 'right'; g.fillText('Powered by Soundcharts', W-84, H-90);
+  const blob = await new Promise(r=>cv.toBlob(r,'image/png')); if(!blob){ toast('Image impossible à créer'); return; }
+  const file = new File([blob], 'pulse-music-story.png', {type:'image/png'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){ navigator.share({files:[file], title:'Pulse Music'}).catch(()=>{}); return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pulse-music-story.png'; document.body.appendChild(a); a.click(); a.remove(); toast('Story enregistrée (image)');
+}
+function storyFromChart(){
+  const rows = [...document.querySelectorAll('#homeGenreChartList .track-row, #homeCountryList .track-row, #homeCityList .track-row')].slice(0,10);
+  if(!rows.length){ toast('Classement en cours de chargement'); return; }
+  const label = state.scope==='country' ? cname(state.selectedCountry) : (state.genreFilters.size ? trendGenreLabel() : 'Monde');
+  makeStory('TOP 10 '+label.toUpperCase(), state.scope==='country' ? 'Classement Dance Apple Music du jour' : 'Classement Beatport du jour', rows.map((r,i)=>({rank:i+1, title:(r.querySelector('.t-title')||{}).textContent||'', sub:(r.querySelector('.t-sub')||{}).textContent||''})));
+}
+function storyFromTrack(){ if(!rtStory){ toast('Fiche en cours de chargement'); return; } makeStory(rtStory.title, rtStory.sub, rtStory.lines.length ? rtStory.lines : [{rank:'–', title:'Pas encore classé', sub:'À suivre sur Pulse Music'}]); }
+let nbLast = [];
+function storyFromNextBig(){ if(!nbLast.length){ toast('Liste en cours de chargement'); return; } makeStory('NEXT BIG TRACKS', 'Les titres qui montent le plus vite', nbLast.slice(0,10).map((x,i)=>({rank:i+1, title:x.title, sub:x.artist+' · +'+x.up+' places'}))); }
+
+// Préparer un set : BPM mesuré sur l'extrait Apple de 30 s (même analyse que MIX), puis playlist triée du plus lent au plus rapide.
+let setBusy = false;
+async function prepareSet(name){
+  const items = plMap[name]; if(!items || !items.length || setBusy) return;
+  setBusy = true; const box = document.getElementById('setStatus');
+  for(let i=0;i<items.length;i++){
+    const f = items[i]; if(box) box.textContent = `Analyse du tempo ${i+1}/${items.length} : ${f.title}…`;
+    if(f.bpm) continue;
+    let hit = itStoreGet(f);
+    if(!hit){ hit = await lookupCoverCheap(f); if(coverUsedNet) await new Promise(r=>setTimeout(r,3500)); } // limite Apple : ~20 requêtes/min
+    if(hit && hit.previewUrl){ try{ const r = await djBpm(hit.previewUrl); if(r && r.bpm) f.bpm = Math.round(r.bpm*10)/10; }catch(e){} }
+  }
+  items.sort((a,b)=>(a.bpm||999)-(b.bpm||999)); plSave(); setBusy = false;
+  const n = items.filter(f=>f.bpm).length;
+  toast(`Set prêt : ${n}/${items.length} tempos trouvés, du plus lent au plus rapide`);
+  if(state.view==='playlists' && plOpen===name) renderView();
 }
 
 /* ============================================================================
    EXPLORE — World map / Country ranking / City ranking
    ============================================================================ */
 function renderExplore(){
-  // Ville retirée ici aussi — mode forcé sur 'country', plus de toggle tant
-  // qu'il n'y a qu'un seul choix.
-  const mode = 'country';
-  const items = mode==='country' ? COUNTRIES : REAL_CITIES;
   return `
   <div class="topbar">
     <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('explore.title')}</div></div>
   </div>
   <div class="section-title"><h2>${tr('explore.selectZone')}</h2></div>
-  <div class="country-grid">
-    ${items.map(it=>{
-      const id = mode==='country'? it.code : it.id;
-      const label = mode==='country'? cname(it.code) : it.name;
-      const flag = mode==='country'? it.flag : countryByCode(it.country).flag;
-      const topScore = mode==='country'
-        ? Math.max(...CITIES.filter(c=>c.country===it.code).map(c=>Math.max(...TRACKS.slice(0,40).map(t=>t.cityAffinity[c.id]||0))), 0)
-        : Math.max(...TRACKS.slice(0,40).map(t=>t.cityAffinity[it.id]||0), 0);
-      return `
-      <div class="country-card" data-action="explore-open" data-mode="${mode}" data-id="${id}">
-        <div class="fl">${flag}</div>
-        <div class="nm">${esc(label)}</div>
-        <div class="ct">${mode==='country'? citiesFollowedLabel(CITIES.filter(c=>c.country===it.code).length) : tr('explore.activeScene')}</div>
-        <div class="meter"><div style="width:${clamp(topScore,8,100)}%"></div></div>
-      </div>`;
-    }).join('')}
+  <div style="font-size:11px;color:var(--text-muted);padding:0 18px 10px;line-height:1.5;">Le n°1 électro de chaque pays aujourd'hui (Apple Music Dance). Touchez un pays pour son Top 10.</div>
+  <div class="country-grid" id="exploreGrid">
+    ${COUNTRIES.map(it=>`
+      <div class="country-card" style="min-width:0;overflow:hidden;" data-action="explore-open" data-mode="country" data-id="${it.code}" data-cc="${it.code}">
+        <div class="fl">${it.flag}</div>
+        <div class="nm">${esc(cname(it.code))}</div>
+        <div class="ct" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">…</div>
+      </div>`).join('')}
   </div>
   <div id="exploreDetail"></div>
+  <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:8px;">Powered by Soundcharts</div>
   <div style="height:10px;"></div>`;
+}
+let exploreTopsP = null;
+async function loadExploreTops(){
+  exploreTopsP = exploreTopsP || fetch(`${SUPABASE_URL}/rest/v1/country_electronic_entries?rank=eq.1&select=country_code,title,artist_name`, { headers: SUPABASE_HEADERS }).then(r=>r.json()).catch(()=>[]);
+  const rows = await exploreTopsP;
+  if(!Array.isArray(rows) || !rows.length){ exploreTopsP = null; return; }
+  const top = {}; rows.forEach(r=>{ top[r.country_code] = r; });
+  document.querySelectorAll('#exploreGrid [data-cc]').forEach(el=>{
+    const r = top[el.dataset.cc];
+    if(!r){ el.remove(); return; } // pays sans classement synchronisé : masqué
+    el.querySelector('.ct').textContent = '#1 · ' + r.title + ' — ' + (r.artist_name||'');
+  });
 }
 function renderExploreDetail(mode, id){
   if(mode==='city'){
     const c = cityById(id);
     const title = countryByCode(c.country).flag+' '+c.name.toUpperCase();
-    const platform = state.exploreCityPlatform || 'spotify';
     return `
       <div class="hpad" style="margin-top:6px;">
         <div class="card">
@@ -3296,33 +3449,20 @@ function renderExploreDetail(mode, id){
       </div>`;
   }
   const c = countryByCode(id);
-  const title = c.flag+' '+cname(id).toUpperCase();
-  const cities = CITIES.filter(x=>x.country===id);
-  const list = TRACKS.filter(trackMatchesGenreFilter).slice().sort((a,b)=>{
-    const av = Math.max(...cities.map(ci=>a.cityAffinity[ci.id]||0), 0);
-    const bv = Math.max(...cities.map(ci=>b.cityAffinity[ci.id]||0), 0);
-    return bv-av;
-  }).slice(0,8);
-  const sub = cities.map(c=>c.name).join(' · ');
   return `
     <div class="hpad" style="margin-top:6px;">
       <div class="card">
-        <div style="font-weight:800;font-size:14px;">${title}</div>
-        <div style="color:var(--text-muted);font-size:11px;margin-top:2px;">${esc(sub)}</div>
-        <div style="margin-top:10px;">
-        ${list.map((t,i)=>`
-          <div class="track-row" style="padding-left:0;" data-action="open-track" data-id="${t.id}">
-            <div class="rank ${i<3?'top3':''}">${i+1}</div>
-            ${coverHTML(t,false)}
-            <div class="t-info">
-              <div class="t-title">${esc(t.title)}</div>
-              <div class="t-sub">${esc(t.artist)}</div>
-            </div>
-            <div class="t-right"><div class="t-score tabular">${t.djScore}</div></div>
-          </div>`).join('')}
-        </div>
+        <div style="font-weight:800;font-size:14px;">${c.flag} TOP 10 ${esc(cname(id).toUpperCase())}</div>
+        <div style="color:var(--text-muted);font-size:11px;margin-top:2px;">Classement Dance Apple Music du jour</div>
+        <div id="exploreCountryList" style="margin-top:10px;"><div class="empty-msg">Chargement…</div></div>
+        <button class="btn btn-primary btn-block" style="margin-top:10px;" data-action="explore-top100" data-cc="${id}">Voir le Top 100 ${esc(cname(id))} →</button>
       </div>
     </div>`;
+}
+async function loadExploreCountryList(cc){
+  const entries = await fetchCountryElectronic(cc);
+  const host = document.getElementById('exploreCountryList');
+  if(host) host.innerHTML = realChartListHTML(entries.slice(0,10));
 }
 async function loadExploreCityList(appCityId){
   const platform = state.exploreCityPlatform || 'spotify';
@@ -3379,7 +3519,7 @@ function loadRadarRows(){
           const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${col},rank,previous_rank,title,artist_name,cover_url&order=id.asc&limit=1000&offset=${off}`, { headers: SUPABASE_HEADERS });
           const rows = await res.json();
           if(!Array.isArray(rows) || !rows.length) break;
-          rows.forEach(r=>{ if(!isPlaceholderTitle(r.title)) out.push({kind, key:r[col], rank:r.rank, prev:r.previous_rank, title:r.title, artist:r.artist_name||'', cover:r.cover_url, ct:coreTitle(r.title), na:normText(r.artist_name), q:normText(r.title+' '+r.artist_name)}); });
+          rows.forEach(r=>{ if(!isPlaceholderTitle(r.title)) out.push({kind, key:r[col], rank:r.rank, prev:r.previous_rank || null, title:r.title, artist:r.artist_name||'', cover:r.cover_url, ct:coreTitle(r.title), na:normText(r.artist_name), q:normText(r.title+' '+r.artist_name)}); });
           if(rows.length<1000) break;
         }catch(e){ break; }
       }
@@ -3422,7 +3562,7 @@ async function loadRadar(){
   if(state.radarArtist){ loadArtistStats(); return; }
   const t = state.radarTab;
   if(t==='search'){ renderRadarSearch(); return; }
-  if(t==='mine'){ const m = myArtists(), host = document.getElementById('radarBody'); if(host) host.innerHTML = m.length ? m.map(n=>`<div style="padding:10px 18px;"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">${esc(n)}${state.user && normText(n)===normText(state.user.artistName) ? ' <span style="font-size:10px;color:var(--text-muted);">(mon artiste)</span>' : ''}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span><span class="chip" data-action="del-artist" data-n="${esc(n)}">✕ Retirer</span></div></div>`).join('') + '<div class="empty-msg">Pour ajouter un autre artiste : 🔍 Rechercher.</div>' : '<div class="empty-msg">Aucun artiste suivi.<br>Allez dans 🔍 Rechercher, trouvez votre artiste et choisissez-le : il est inclus dans Premium. 📡</div>'; return; }
+  if(t==='mine'){ const m = myArtists(), host = document.getElementById('radarBody'); if(host) host.innerHTML = m.length ? m.map(n=>`<div style="padding:10px 18px;"><div style="font-weight:800;font-size:14px;margin-bottom:6px;">${esc(n)}${state.user && normText(n)===normText(state.user.artistName) ? ' <span style="font-size:10px;color:var(--text-muted);">(mon artiste)</span>' : ''}</div><div class="chiprow" style="padding:0;flex-wrap:wrap;overflow:visible;"><span class="chip active" data-action="artist-stats" data-n="${esc(n)}">📊 Statistiques</span><span class="chip" data-action="del-artist" data-n="${esc(n)}">✕ Retirer</span></div></div>`).join('') + '<div class="empty-msg">Pour ajouter un autre artiste : 🔍 Rechercher.</div>' : '<div class="empty-msg">Aucun artiste suivi.<br>Allez dans 🔍 Rechercher, trouvez votre artiste et choisissez-le : il est inclus dans Premium. 📡</div>'; loadArtistNews(m); return; }
   const rows = await loadRadarRows();
   const html = t==='alerts' ? radarAlertsHTML(rows) : radarSavedHTML(rows);
   const host = document.getElementById('radarBody');
@@ -4094,8 +4234,6 @@ function renderProfile(){
     </div>`;
   }
   const u = state.user;
-  const played = pickN(TRACKS, 5, mulberry32(u.name.length*13+7));
-  const similar = FAKE_DJS.filter(d=>d.genres.some(g=>u.genres.includes(g))).slice(0,4);
   return `
   <div class="topbar"><div class="brand-row"><div class="brand"><span class="dot"></span>${tr('profile.titleProfile')}</div></div></div>
   <div class="hpad" style="margin-top:4px;">
@@ -4103,7 +4241,7 @@ function renderProfile(){
       <div style="width:58px;height:58px;border-radius:50%;background:var(--brand-grad);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;">${(u.artistName||u.name||'?')[0].toUpperCase()}</div>
       <div style="flex:1;">
         <div style="font-weight:800;font-size:15px;">${esc(u.artistName)}</div>
-        <div style="font-size:11.5px;color:var(--text-muted);">${countryByCode(u.country).flag} ${cityById(u.city).name}, ${cname(u.country)}</div>
+        <div style="font-size:11.5px;color:var(--text-muted);">${u.country && countryByCode(u.country) ? countryByCode(u.country).flag+' '+(cityById(u.city)||{name:''}).name+', '+cname(u.country) : ''}</div>
         <div style="margin-top:5px;">${u.isPro? `<span class="status-chip good"><span class="sw"></span>${tr('profile.proDj')}</span>` : `<span class="status-chip warning"><span class="sw"></span>${tr('profile.free')}</span>`}</div>
       </div>
     </div>
@@ -4122,25 +4260,12 @@ function renderProfile(){
     </div>
   </div>` : ''}
 
-  <div class="section-title"><h2>${tr('profile.topPlayed')}</h2></div>
-  <div class="track-list">${played.map((t,i)=>renderTrackRow(t,i,false)).join('')}</div>
-
-  <div class="section-title"><h2>${tr('profile.similarDjs')}</h2></div>
-  <div class="hscroll">
-    ${similar.length? similar.map(d=>`
-      <div class="card" style="flex:0 0 140px;text-align:center;">
-        <div style="width:44px;height:44px;border-radius:50%;background:var(--card-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:800;margin:0 auto;">${d.name[0]}</div>
-        <div style="font-weight:700;font-size:12px;margin-top:8px;">${esc(d.name)}</div>
-        <div style="font-size:10px;color:var(--text-muted);">${cityById(d.city).name}</div>
-      </div>`).join('') : `<div class="empty-msg">${tr('profile.noMatch')}</div>`}
-  </div>
-
   <div class="section-title"><h2>${tr('profile.language')}</h2></div>
   <div class="hpad">${langSwitcherHTML(state.lang)}</div>
 
   <div class="divider"></div>
   <div class="hpad" style="display:flex;flex-direction:column;gap:9px;">
-    <button class="btn btn-outline btn-block" data-action="open-admin">${tr('profile.admin')}</button>
+    ${String(u.email||'').toLowerCase()==='azizbena@gmail.com' ? `<button class="btn btn-outline btn-block" data-action="open-admin">${tr('profile.admin')}</button>` : ''}
     <button class="btn btn-ghost btn-block" data-action="logout">${tr('profile.logout')}</button>
     ${authSession ? (state.confirmDelete ? `<div style="border:1px solid #c0392b;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;"><div style="font-size:12px;line-height:1.4;">${tr('profile.deleteConfirm')}</div><button class="btn btn-block" style="background:#c0392b;color:#fff;" data-action="delete-account-confirm">${tr('profile.deleteYes')}</button><button class="btn btn-ghost btn-block" data-action="delete-account-cancel">${tr('profile.deleteNo')}</button></div>` : `<button class="btn btn-ghost btn-block" style="color:#ff6b6b;" data-action="delete-account">${tr('profile.deleteAccount')}</button>`) : ''}
   </div>
@@ -4190,7 +4315,7 @@ function renderTrackOverlay(){
           <div style="display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:8px;padding:5px 12px;border-radius:20px;background:rgba(252,61,98,.12);color:#fc3d62;font-size:10.5px;font-weight:800;letter-spacing:.2px;">${tr('track.audioRealBadgeApple')}</div>
           <button class="btn btn-primary btn-block big-play-btn" data-action="toggle-play" data-id="${t.id}">${state.playingId===t.id? tr('track.pauseExtract') : tr('track.playExtract')}</button>
           <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteApple')}${t.itunesTrackUrl ? ` · <a href="${t.itunesTrackUrl}" target="_blank" rel="noopener" style="color:#fc3d62;">${tr('track.appleMusic')}</a>` : ''}</div>
-        ` : `
+        ` : t.youtubeId ? '' : `
           <!-- No Apple Music preview found for this track — Spotify's
                widget is no longer used as a fallback, so this just plays
                the generated preview. Same button/behavior as every Monde/
@@ -4207,47 +4332,6 @@ function renderTrackOverlay(){
             <div style="text-align:center;font-size:10px;color:var(--text-muted);margin-top:6px;">${tr('track.audioRealNoteYoutube')}</div>
           </div>
         ` : ''}
-      </div>
-
-      <div class="hpad" style="margin-top:14px;">
-        <div class="card" style="text-align:center;">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:800;letter-spacing:.6px;">${tr('track.djScore')}</div>
-          <div style="font-size:40px;font-weight:800;margin:4px 0;" class="tabular">${t.djScore}<span style="font-size:16px;color:var(--text-muted);">/100</span></div>
-          <div class="meter" style="margin:0 auto;max-width:220px;"><div style="width:${t.djScore}%"></div></div>
-          <div style="margin-top:10px;">${trendBadge(t.trend7d)} <span style="color:var(--text-muted);font-size:11px;">${tr('track.days7')}</span></div>
-        </div>
-      </div>
-
-      <div class="hpad" style="display:flex;gap:9px;margin-top:12px;">
-        <div class="stat-tile"><div class="label">${tr('track.djs')}</div><div class="value tabular">${fmtNum(t.djsPlaying)}</div></div>
-        <div class="stat-tile"><div class="label">${tr('track.countries')}</div><div class="value tabular">${t.countriesCount}</div></div>
-        <div class="stat-tile"><div class="label">${tr('track.cities')}</div><div class="value tabular">${t.citiesCount}</div></div>
-      </div>
-      <div class="hpad" style="margin-top:9px;">
-        <div class="stat-tile"><div class="label">${tr('track.clubsEvents')}</div><div class="value tabular">${t.clubsCount? fmtNum(t.clubsCount) : tr('track.dataUnavailable')}</div></div>
-      </div>
-
-      <div class="section-title"><h2>${tr('track.topLocations')}</h2></div>
-      <div class="hpad">
-        <div class="card">
-          ${topLoc.map((l,i)=>`
-            <div class="locrow">
-              <div class="rk">#${i+1}</div>
-              <div class="flag">${countryByCode(l.c.country).flag}</div>
-              <div class="nm">${l.c.name}</div>
-              <div class="rankbadge">${Math.round(l.v)}/100</div>
-            </div>`).join('')}
-        </div>
-      </div>
-
-      <div class="section-title"><h2>${tr('track.trendHistory')}</h2></div>
-      <div class="periodrow">
-        <div class="chip ${state.trackChartPeriod==='7d'?'active':''}" data-action="chart-period" data-p="7d">${tr('track.days7chip')}</div>
-        <div class="chip ${state.trackChartPeriod==='30d'?'active':''}" data-action="chart-period" data-p="30d">${tr('track.days30chip')}</div>
-        <div class="chip ${state.trackChartPeriod==='90d'?'active':''} ${locked90?'ghost':''}" data-action="${locked90?'open-paywall':'chart-period'}" data-p="90d">${tr('track.days90chip')} ${locked90?'🔒':''}</div>
-      </div>
-      <div class="hpad">
-        <div class="card"><div id="chartHost"></div></div>
       </div>
 
       <div class="section-title"><h2>${tr('track.details')}</h2></div>
@@ -4273,7 +4357,6 @@ function renderTrackOverlay(){
       <div style="height:20px;"></div>
     </div>
   `;
-  drawTrendChart(t);
 }
 
 /* ---------------------------- TREND CHART (SVG, dataviz-skill compliant) --- */
@@ -4728,9 +4811,17 @@ document.addEventListener('click', async (e)=>{
   else if(a==='featured-del'){ featuredDel(el.dataset.id); }
   else if(a==='mini-player-stop'){ plQ = null; stopPlayback(); }
   else if(a==='explore-mode'){ state.exploreMode = el.dataset.m; document.getElementById('view-container').innerHTML = renderExplore(); }
+  else if(a==='real-track'){ openRealTrack(el.dataset.id); }
+  else if(a==='rt-artist'){ closeTrack(); openArtistStats(el.dataset.n); }
+  else if(a==='story-chart'){ storyFromChart(); }
+  else if(a==='story-track'){ storyFromTrack(); }
+  else if(a==='story-nb'){ storyFromNextBig(); }
+  else if(a==='pl-set'){ prepareSet(plOpen); }
+  else if(a==='explore-top100'){ state.scope = 'country'; state.selectedCountry = el.dataset.cc; state.countryCity = ''; state.genreFilters = new Set(); state.view = 'home'; renderView(); }
   else if(a==='explore-open'){
     const host = document.getElementById('exploreDetail');
     if(host) host.innerHTML = renderExploreDetail(el.dataset.mode, el.dataset.id);
+    if(el.dataset.mode==='country'){ loadExploreCountryList(el.dataset.id); if(host) host.scrollIntoView({behavior:'smooth', block:'start'}); }
     if(el.dataset.mode==='city'){
       state.exploreOpenCityId = el.dataset.id;
       loadExploreCityList(el.dataset.id);
