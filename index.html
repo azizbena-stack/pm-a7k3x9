@@ -2984,7 +2984,7 @@ function renderHome(){
   </div>
 
   <div class="section-title"><h2>🏆 ${state.scope==='world'?tr('home.topGlobal'):state.scope==='country'?tr('home.topPrefix')+' 100 '+(state.countryCity?cityById(state.countryCity).name:cname(state.selectedCountry)).toUpperCase():''}</h2>
-    <span style="display:flex;gap:12px;align-items:center;"><span class="link" data-action="story-chart">📸 Story</span>${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}</span>
+    <span style="display:flex;gap:12px;align-items:center;">${shareBtn('story-chart')}${!isPro()?`<span class="link" data-action="open-paywall">${tr('home.pro')}</span>`:''}</span>
   </div>
   ${cityViewId() ? `
   <div class="track-list" id="homeCityList">
@@ -3229,7 +3229,7 @@ function renderNextBig(){
   }
   return `
   <div class="topbar">
-    <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('nextbig.title')}<small>${tr('nextbig.subtitle')}</small></div><button class="icon-btn" data-action="story-nb" title="Story Instagram">📸</button></div>
+    <div class="brand-row"><div class="brand"><span class="dot"></span>${tr('nextbig.title')}<small>${tr('nextbig.subtitle')}</small></div>${shareBtn('story-nb')}</div>
   </div>
   <div style="font-size:11px;color:var(--text-muted);padding:0 18px 8px;line-height:1.5;">Les titres qui grimpent le plus vite depuis hier dans tous nos classements (10 genres Beatport + 30 pays Apple Music Dance).</div>
   <div id="nextBigList" class="hpad" style="display:flex;flex-direction:column;gap:12px;margin-top:4px;"><div class="empty-msg">Chargement…</div></div>
@@ -3300,7 +3300,7 @@ async function openRealTrack(id){
     <div class="overlay-header">
       <button class="close-btn" data-action="close-track">✕</button>
       <div style="font-size:11px;font-weight:800;color:var(--text-muted);letter-spacing:.6px;">${tr('track.detailTitle')}</div>
-      <button class="close-btn" data-action="story-track" title="Story Instagram">📸</button>
+      ${shareBtn('story-track')}
     </div>
     <div style="flex:1;overflow-y:auto;">
       <div style="text-align:center;padding:6px 24px 10px;">
@@ -3355,6 +3355,8 @@ async function loadArtistNews(names){
 }
 
 // Story Instagram (1080×1920) aux couleurs de l'app : partage direct sur téléphone, sinon téléchargement de l'image.
+// Bouton « Partager » (icône de partage + texte) : remplace l'ancien « 📸 Story » partout.
+function shareBtn(action){ return `<span data-action="${action}" role="button" style="display:inline-flex;align-items:center;gap:5px;flex:none;font-size:11.5px;font-weight:700;color:var(--brand-a);cursor:pointer;"><svg class="svgi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>Partager</span>`; }
 async function makeStory(title, sub, lines){
   try{ await Promise.all([document.fonts.load('800 80px Unbounded'), document.fonts.load('700 40px "Space Grotesk"'), document.fonts.load('400 30px "Space Grotesk"')]); }catch(e){}
   const W = 1080, H = 1920, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
