@@ -3147,13 +3147,14 @@ async function fetchGenreChart(genreKey){
 // Ainsi un titre ne peut jamais être plus haut en Monde qu'un titre mieux classé dans son propre genre.
 async function fetchWorldMerged(){
   try{
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/genre_chart_entries?genre_key=in.(${REAL_GENRE_KEYS.join(',')})&rank=lte.30&select=rank,previous_rank,title,artist_name,cover_url&limit=1000`, { headers: SUPABASE_HEADERS });
-    const rows = await res.json(); if(!Array.isArray(rows)) return [];
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/genre_chart_entries?genre_key=in.(${REAL_GENRE_KEYS.join(',')})&or=(rank.lte.30,previous_rank.lte.30)&select=rank,previous_rank,title,artist_name,cover_url&limit=2000`, { headers: SUPABASE_HEADERS });
+    const all = await res.json(); if(!Array.isArray(all)) return [];
     const up = r => r.previous_rank ? r.previous_rank - r.rank : 0;
-    rows.sort((a,b)=> a.rank-b.rank || up(b)-up(a));
-    const seen = new Set();
-    return rows.filter(r=>{ const k = chartKey(r.title, r.artist_name); return !isPlaceholderTitle(r.title) && !seen.has(k) && seen.add(k); })
-      .slice(0,100).map((r,i)=>({ rank:i+1, previous_rank:null, tracks:{ title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null } }));
+    const merge = (rows, cmp) => { const seen = new Set(); return rows.sort(cmp).filter(r=>{ const k = chartKey(r.title, r.artist_name); return !isPlaceholderTitle(r.title) && !seen.has(k) && seen.add(k); }).slice(0,100); };
+    // Flèches : même fusion refaite avec les places de la veille (previous_rank) → place d'hier dans Monde / TOUT ; absent hier = NEW.
+    const yest = new Map(merge(all.filter(r=>r.previous_rank>0 && r.previous_rank<=30), (a,b)=>a.previous_rank-b.previous_rank).map((r,i)=>[chartKey(r.title, r.artist_name), i+1]));
+    return merge(all.filter(r=>r.rank<=30), (a,b)=> a.rank-b.rank || up(b)-up(a))
+      .map((r,i)=>({ rank:i+1, previous_rank:yest.get(chartKey(r.title, r.artist_name)) || 0, tracks:{ title:r.title, artist_name:r.artist_name, cover_url:r.cover_url, youtube_id:null } }));
   }catch(e){ return []; }
 }
 // Trending Now : vraies plus fortes montées (place de la veille → place du jour) du classement affiché (genre(s) Beatport ou pays).
