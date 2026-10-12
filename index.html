@@ -2858,7 +2858,7 @@ function quickGenreActive(key){
 // chart réel accessible depuis l'app pour ces 2-là.
 // Genres qui ont un vrai Top 100 synchronisé (indie-tech n'a pas de classement chez Beatport : reste sur le message d'attente).
 // « + Genres » (12/10/2026) : classements Apple Music par genre et par pays via Soundcharts (fonction Supabase clever-processor = genre-chart.ts).
-const MORE_GENRES = [['am:pop-126','POP'],['am:hip-hop-rap-116','RAP FRANÇAIS'],['am:hip-hop-rap-173','RAP US'],['am:variete-francaise','VARIÉTÉ FRANÇAISE'],['am:latino-1','LATINO / REGGAETON'],['am:r-b-soul-113','R&B / SOUL'],['am:reggae-7','REGGAE'],['am:rock-124','ROCK'],['am:k-pop-122','K-POP'],['am:alternative-111','ALTERNATIVE'],['am:country-95','COUNTRY'],['am:jazz-109','JAZZ'],['am:amazon-top-200-song-all-genres','TOP AMAZON MUSIC']];
+const MORE_GENRES = [['am:pop-126','POP'],['am:hip-hop-rap-116','RAP FRANÇAIS'],['am:hip-hop-rap-173','RAP US'],['am:variete-francaise','VARIÉTÉ FRANÇAISE'],['am:latino-1','LATINO / REGGAETON'],['am:r-b-soul-113','R&B / SOUL'],['am:reggae-7','REGGAE'],['am:rock-124','ROCK'],['am:k-pop-122','K-POP'],['am:alternative-111','ALTERNATIVE'],['am:country-95','COUNTRY'],['am:jazz-109','JAZZ']];
 Object.assign(CHART_GENRE_LABEL, Object.fromEntries(MORE_GENRES));
 const REAL_GENRE_KEYS = ['afro-house','melodic','house','indie-dance','hard-techno','deep-house','funky-house','minimal-deeptech','progressive-house','disco-house'];
 function activeRealGenreKey(){
