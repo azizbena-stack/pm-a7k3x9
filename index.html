@@ -1300,7 +1300,7 @@ const I18N = {
     'auth.checkEmail': `Compte créé ! Vérifie ta boîte mail pour confirmer, puis connecte-toi.`,
     'auth.errorEmailNotConfirmed': `Confirme d'abord ton email (vérifie ta boîte de réception)`,
     'nav.top': `Top`,
-    'nav.nextbig': `Next Big`,
+    'nav.nextbig': `Futurs hits`,
     'nav.explore': `Explore`,
     'nav.radar': `Radar`,
     'nav.profile': `Profil`,
@@ -1308,7 +1308,7 @@ const I18N = {
     'home.scopeWorld': `MONDE`,
     'home.scopeCountry': `PAYS`,
     'home.scopeCity': `VILLE`,
-    'home.periodToday': `TODAY`,
+    'home.periodToday': `AUJOURD'HUI`,
     'home.period7d': `7 JOURS`,
     'home.period30d': `30 JOURS`,
     'home.chipAll': `TOUT`,
@@ -1318,12 +1318,12 @@ const I18N = {
     'home.chipMelodic': `MELODIC`,
     'home.chipTechno': `TECHNO`,
     'home.chipMoreGenres': `+ Genres`,
-    'home.trendingNow': `🔥 Trending Now`,
+    'home.trendingNow': `🔥 Tendances`,
     'home.topGlobal': `GLOBAL TOP 100`,
     'home.topPrefix': `TOP`,
     'home.pro': `Premium ↗`,
     'home.unlockTop100': `🔓 Débloquer le Top 100 complet — Premium`,
-    'nextbig.title': `NEXT BIG TRACKS`,
+    'nextbig.title': `FUTURS HITS`,
     'nextbig.subtitle': `DÉTECTION PRÉCOCE`,
     'nextbig.proOnlyTitle': `Réservé aux membres Premium`,
     'nextbig.proOnlyDesc': `Découvre les morceaux qui explosent avant tout le monde, avant qu'ils deviennent des hits mondiaux.`,
@@ -1359,7 +1359,7 @@ const I18N = {
     'profile.proDj': `Premium`,
     'profile.free': `FREE`,
     'profile.goProTitle': `⭐ Passe Premium`,
-    'profile.goProDesc': `Top 100 complet, Next Big Tracks, Trending complet, playlists et mix automatique, statistiques d'artistes en détail.`,
+    'profile.goProDesc': `Top 100 complet, Futurs hits, Tendances complètes, playlists et mix automatique, statistiques d'artistes en détail.`,
     'profile.viewProOffer': `Voir l'offre Premium`,
     'profile.topPlayed': `Top morceaux joués`,
     'profile.similarDjs': `DJs au style similaire`,
@@ -1423,7 +1423,7 @@ const I18N = {
     'paywall.activate': `Activer Premium (démo)`,
     'paywall.later': `Plus tard`,
     'paywall.labelOffer': `Offre Label/Artiste avec analytics avancés disponible sur demande.`,
-    'paywall.f1': `Top 100 complet`, 'paywall.f2': `10 genres et 30 pays, chaque jour`, 'paywall.f3': `🚀 Next Big Tracks`, 'paywall.f4': `🔥 Trending Now complet`, 'paywall.f5': `🎵 Playlists + mix automatique`, 'paywall.f6': `📊 Statistiques d'artistes complètes`, 'paywall.f7': `Pays, villes et playlists de chaque artiste`,
+    'paywall.f1': `Top 100 complet`, 'paywall.f2': `10 genres et 30 pays, chaque jour`, 'paywall.f3': `🚀 Futurs hits`, 'paywall.f4': `🔥 Tendances complètes`, 'paywall.f5': `🎵 Playlists + mix automatique`, 'paywall.f6': `📊 Statistiques d'artistes complètes`, 'paywall.f7': `Pays, villes et playlists de chaque artiste`,
     'toast.addedToRadar': `Ajouté à ton Radar 📡`,
     'toast.proActivated': `🎉 Premium activé (démo) — tout est débloqué !`,
     'toast.profileCreated': `Profil DJ créé ✅`,
@@ -3037,7 +3037,7 @@ async function loadHomeCityList(){
   if(cityViewId()!==appCityId) return;
   const electro = entries.filter(e=>e.tracks && isElectronicEntry(uni, e.tracks));
   let shown = [], note = '';
-  if(electro.length>=5){ shown = electro.map((e,i)=>({...e, rank:i+1, previous_rank:null})); note = 'Uniquement les morceaux électro du classement de la ville.'; }
+  if(electro.length>=5){ const yest = new Map(electro.filter(e=>e.previous_rank>0).sort((a,b)=>a.previous_rank-b.previous_rank).map((e,i)=>[e,i+1])); shown = electro.map((e,i)=>({...e, rank:i+1, previous_rank:yest.get(e)||0})); note = 'Uniquement les morceaux électro du classement de la ville.'; }
   else if(cEntries.length){ shown = cEntries; note = 'Pas assez de morceaux électro dans le classement de cette ville : voici le classement électro du pays.'; }
   if(!shown.length){
     // Pas encore de données électro pour ce pays : sélection électro de démonstration, classée par affinité avec la ville.
