@@ -326,10 +326,14 @@ body{padding:0; display:block; background:#0a0a0f;}
 .app-screen, .overlay, #toast-container{zoom:1.3;}
 .overlay > *{max-width:1000px; width:100%; margin-left:auto; margin-right:auto;}
 .top-nav, #view-container{padding-left:max(16px, calc((100% - 1000px)/2)); padding-right:max(16px, calc((100% - 1000px)/2));}
-/* lignes de morceaux : icônes sous le titre, alignées à gauche */
-.track-row{flex-wrap:wrap; row-gap:4px; padding:10px 8px;}
-.track-row .t-right{flex:0 0 100%; display:flex; align-items:center; gap:14px; text-align:left; padding-left:90px;}
+/* lignes de morceaux : titre · artiste · label sur une ligne, icônes à droite */
 .track-row + .track-row{border-top:1px solid var(--border-soft); border-radius:0;}
+.track-row .t-info{display:grid; grid-template-columns:2fr 1.5fr 1fr; gap:16px; align-items:center;}
+.track-row .t-sub{margin-top:0;}
+.t-meta{font-size:11.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.track-row .t-right{display:flex; align-items:center; gap:12px;}
+#authScreen .auth-wrap{justify-content:safe center; overflow-y:auto; scrollbar-width:none;}
+#authScreen .auth-wrap::-webkit-scrollbar{display:none;}
 </style>
 </head>
 <body>
@@ -729,6 +733,10 @@ function addToPl(id, name){
   if(!l.some(f=>itKey({title:f.title, artist:f.artist})===k)) l.push({title:t.title, artist:t.artist});
   plSave(); document.getElementById('playChoice').classList.add('hidden'); toast('Ajouté à « '+name+' »');
 }
+function ordiMeta(title){ // version ordinateur : label (catalogue) — nos classements n'ont ni BPM ni label
+  if(!ordiMeta.m){ ordiMeta.m = {}; REAL_TRACKS.forEach(x=>{ if(x.label) ordiMeta.m[coreTitle(x.title)] = x.label; }); }
+  return `<div class="t-meta">${esc(ordiMeta.m[coreTitle(title)]||'')}</div>`;
+}
 function renderRealTrackRow(entry, idx, locked, extra=''){
   const t = entry.tracks || {};
   const seedKey = (t.title||'')+'|'+(t.artist_name||'');
@@ -762,7 +770,7 @@ function renderRealTrackRow(entry, idx, locked, extra=''){
     ${coverHTML(t2,false)}
     <div class="t-info" ${locked?'':`data-action="real-track" data-id="${rid}"`}>
       <div class="t-title">${esc(t2.title)}</div>
-      <div class="t-sub">${esc(t2.artist)}</div>
+      <div class="t-sub">${esc(t2.artist)}</div>${ordiMeta(t2.title)}
     </div>
     <div class="t-right">${realTrackMoveHTML(entry.rank, entry.previous_rank)}${trackMarksHTML(t2)}${extra}</div>
   </div>`;
@@ -3220,7 +3228,7 @@ function renderTrackRow(t, idx, locked){
     ${coverHTML(t,false)}
     <div class="t-info">
       <div class="t-title">${esc(t.title)}</div>
-      <div class="t-sub"><span class="genre-dot" style="background:${genreById(t.genre).color}"></span>${esc(t.artist)} · ${genreById(t.genre).name}</div>
+      <div class="t-sub"><span class="genre-dot" style="background:${genreById(t.genre).color}"></span>${esc(t.artist)} · ${genreById(t.genre).name}</div>${ordiMeta(t.title)}
     </div>
     <div class="t-right">
       <div class="t-score tabular">${t.djScore}<span style="color:var(--text-muted);font-weight:600;font-size:10.5px;">/100</span></div>
