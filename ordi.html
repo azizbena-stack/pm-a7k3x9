@@ -353,6 +353,12 @@ body{padding:0; display:block; background:#0a0a0f;}
 .home-top > .segmented ~ .segmented button{padding:5px 4px; font-size:10px;}
 .home-top .chiprow{padding-top:8px;}
 .home-top .chiprow .chip{padding:5px 10px; font-size:10px;}
+/* fenêtre « Écouter avec » : petite carte centrée, boutons en tuiles */
+#playChoice{justify-content:center; align-items:center;}
+#playChoice > .sheet-inner{max-width:420px; border-radius:18px; padding:14px; border:1px solid var(--border);}
+#playChoice .sheet-inner > div:last-child{display:grid !important; grid-template-columns:repeat(3, 1fr); gap:8px !important;}
+#playChoice .btn-block{text-align:center !important; padding:10px 4px; font-size:11.5px; white-space:nowrap;}
+#playChoice .btn-block > div{display:none;}
 #authScreen .auth-wrap{justify-content:safe center; overflow-y:auto; scrollbar-width:none;}
 #authScreen .auth-wrap::-webkit-scrollbar{display:none;}
 </style>
