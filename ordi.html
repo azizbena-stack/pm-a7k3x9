@@ -328,7 +328,18 @@ body{padding:0; display:block; background:#0a0a0f;}
 .top-nav, #view-container{padding-left:max(16px, calc((100% - 1000px)/2)); padding-right:max(16px, calc((100% - 1000px)/2));}
 /* lignes de morceaux : titre · artiste · label sur une ligne, icônes à droite */
 .track-row + .track-row{border-top:1px solid var(--border-soft); border-radius:0;}
-.track-row .t-info{display:grid; grid-template-columns:2fr 1.5fr 1fr; gap:16px; align-items:center;}
+.track-row .t-info{display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1.5fr) minmax(0,1.2fr) 58px 74px; gap:14px; align-items:center;}
+.track-row .t-info > div{min-width:0;}
+.t-bpm, .t-key{font-size:11.5px; color:var(--text-secondary); font-variant-numeric:tabular-nums; white-space:nowrap;}
+.ordi-head{cursor:default; padding-top:4px; padding-bottom:6px;}
+.ordi-head .t-info > div{font-size:10px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--text-muted);}
+.track-row .t-right{flex:0 0 210px; justify-content:flex-end;}
+/* Pays : une seule liste (pays), plus compacte ; cartes Tendances plus petites */
+.home-top select[data-action="select-country-city"]{display:none !important;}
+.home-top select[data-action="select-country"]{grid-column:1; padding:4px 10px !important; font-size:11px !important; margin-top:6px !important; border-radius:9px !important;}
+#trendBox .next-card{flex:0 0 132px !important; padding:9px; border-radius:14px;}
+#trendBox .next-card .cover{width:34px; height:34px; flex:0 0 34px; font-size:11px;}
+#trendBox .next-card > div:not(.glow){font-size:10px !important; margin-top:4px !important;}
 .track-row .t-sub{margin-top:0;}
 .t-meta{font-size:11.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .track-row .t-right{display:flex; align-items:center; gap:12px;}
@@ -743,21 +754,27 @@ function addToPl(id, name){
   if(!l.some(f=>itKey({title:f.title, artist:f.artist})===k)) l.push({title:t.title, artist:t.artist});
   plSave(); document.getElementById('playChoice').classList.add('hidden'); toast('Ajouté à « '+name+' »');
 }
-// Version ordinateur : BPM + label. Source : fonction Supabase song-meta (Soundcharts, mémorisée dans la table song_meta),
-// sinon label du catalogue fixe. Les cases sont remplies après affichage (ordiMetaFill), 100 morceaux par appel.
+// Version ordinateur : tableau Titre · Artiste · Label · BPM · Tonalité. Source : fonction Supabase song-meta
+// (Soundcharts, mémorisée dans la table song_meta), sinon label du catalogue fixe. Remplissage après affichage (ordiMetaFill).
 const ORDI_META = {};
 function ordiMeta(title, sc){
   if(!ordiMeta.m){ ordiMeta.m = {}; REAL_TRACKS.forEach(x=>{ if(x.label) ordiMeta.m[coreTitle(x.title)] = x.label; }); }
-  const cat = ordiMeta.m[coreTitle(title)]||'';
-  return `<div class="t-meta"${sc ? ` data-sc="${esc(sc)}"` : ''} data-cat="${esc(cat)}">${esc(sc && ORDI_META[sc] ? ordiMetaText(ORDI_META[sc], cat) : cat)}</div>`;
+  const cat = ordiMeta.m[coreTitle(title)]||'', m = (sc && ORDI_META[sc]) || {};
+  return `<div class="t-meta"${sc ? ` data-sc="${esc(sc)}"` : ''} data-cat="${esc(cat)}">${esc(m.label||cat)}</div><div class="t-bpm">${m.bpm||''}</div><div class="t-key">${esc(m.key||'')}</div>`;
 }
-function ordiMetaText(m, cat){ return [m.bpm ? m.bpm+' BPM' : '', m.label || cat].filter(Boolean).join(' · '); }
 let ordiMetaT = null;
 function ordiMetaFill(){
+  // en-tête du tableau au-dessus de chaque liste de morceaux
+  new Set([...document.querySelectorAll('.track-row .t-meta')].map(e=>e.closest('.track-row').parentNode)).forEach(box=>{
+    if(box.querySelector(':scope > .ordi-head')) return;
+    const first = [...box.children].find(c=>c.classList.contains('track-row') && c.querySelector('.t-meta')); if(!first) return;
+    first.insertAdjacentHTML('beforebegin', '<div class="track-row ordi-head"><div class="rank"></div><div style="flex:0 0 46px;"></div><div class="t-info"><div>Titre</div><div>Artiste</div><div>Label</div><div>BPM</div><div>Tonalité</div></div><div class="t-right"></div></div>');
+  });
   const els = [...document.querySelectorAll('.t-meta[data-sc]:not([data-done])')]; if(!els.length) return;
   els.forEach(e=>e.dataset.done = '1');
   const todo = [...new Set(els.map(e=>e.dataset.sc).filter(u=>!ORDI_META[u]))];
-  const paint = ()=> els.forEach(e=>{ const m = ORDI_META[e.dataset.sc]; if(m) e.textContent = ordiMetaText(m, e.dataset.cat); });
+  const paint = ()=> els.forEach(e=>{ const m = ORDI_META[e.dataset.sc]; if(!m) return;
+    e.textContent = m.label || e.dataset.cat; e.nextElementSibling.textContent = m.bpm || ''; e.nextElementSibling.nextElementSibling.textContent = m.key || ''; });
   if(!todo.length) return paint();
   for(let i=0; i<todo.length; i+=100)
     fetch(`${SUPABASE_URL}/functions/v1/song-meta?uuids=${todo.slice(i,i+100).join(',')}`, { headers: SUPABASE_HEADERS })
